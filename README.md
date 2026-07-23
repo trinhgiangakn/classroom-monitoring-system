@@ -1,3 +1,4 @@
+```text
 classroom-monitoring-system/
 │
 ├── README.md
@@ -174,3 +175,4 @@ classroom-monitoring-system/
     └── acceptance/
         # Acceptance tests mapped to SRS/SoW criteria: BLE rate, latency,
         # Auto rules, curtain timeout, reconnect, and data reliability.
+```
