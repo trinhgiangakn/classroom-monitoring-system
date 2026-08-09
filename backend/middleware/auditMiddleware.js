@@ -1,23 +1,27 @@
 const db = require('../config/db');
 
-const auditLogger = async (req, res, next) => {
-    // Collect information from the request
-    // If the request has passed through verifyToken, it will have req.user
-    const userId = req.user ? req.user.id : null; 
-    
-    const action = `${req.method} ${req.originalUrl}`;
+const SENSITIVE_FIELDS = new Set(['password', 'newPassword', 'token', 'refresh_token']);
 
-    const details = (req.body && Object.keys(req.body).length > 0) 
-                        ? JSON.stringify(req.body) : 'No payload data';
+function safeDetails(body) {
+    if (!body || typeof body !== 'object' || Object.keys(body).length === 0) return null;
+    return JSON.stringify(Object.fromEntries(
+        Object.entries(body).map(([key, value]) => [key, SENSITIVE_FIELDS.has(key) ? '[REDACTED]' : value])
+    ));
+}
 
-    // Write silently to the database
-    db.query(
-        'INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)',
-        [userId, action, details]
-    ).catch(err => console.error("Audit log write error:", err.message));
+const auditLogger = (req, res, next) => {
+    res.once('finish', () => {
+        const userId = req.user?.id ?? null;
+        const action = `${req.method} ${req.originalUrl}`;
+        const details = safeDetails(req.body);
 
-    // Allow the request to continue to the internal API
-    next(); 
+        db.query(
+            'INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [userId, action, details]
+        ).catch(err => console.error('Audit log write error:', err.message));
+    });
+
+    next();
 };
 
 module.exports = { auditLogger };

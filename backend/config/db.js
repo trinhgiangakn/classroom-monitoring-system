@@ -1,25 +1,24 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config({ path: '../.env' });
+const path = require('path');
+
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
 // Create a Connection Pool
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'room_monitoring',
+    database: process.env.DB_NAME || 'classroom_monitoring',
+    timezone: 'Z',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
 });
 
-// Test the connection immediately on startup
-pool.getConnection()
-    .then(connection => {
-        console.log('Successfully connected to MySQL (room_monitoring)!');
-        connection.release();
-    })
-    .catch(err => {
-        console.error('Database connection error:', err.message);
-    });
+async function testConnection() {
+    const connection = await pool.getConnection();
+    connection.release();
+}
 
 module.exports = pool;
+module.exports.testConnection = testConnection;

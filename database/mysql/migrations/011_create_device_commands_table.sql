@@ -1,4 +1,4 @@
-CREATE TABLE device_commands (
+CREATE TABLE IF NOT EXISTS device_commands (
     command_id VARCHAR(50) PRIMARY KEY,
     device_id VARCHAR(50) NOT NULL,
     action VARCHAR(20) NOT NULL,

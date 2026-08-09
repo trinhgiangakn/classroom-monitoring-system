@@ -2,6 +2,7 @@ import { CheckCircle2, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AuthFrame } from '../components/auth/AuthFrame'
+import { API_BASE_URL } from '../lib/api'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -20,7 +21,7 @@ export function ForgotPasswordPage() {
     setError(undefined)
     
     try {
-      const response = await fetch('http://localhost:3000/api/auth/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

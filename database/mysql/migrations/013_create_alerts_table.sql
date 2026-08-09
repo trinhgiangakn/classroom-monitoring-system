@@ -1,4 +1,4 @@
-CREATE TABLE alerts (
+CREATE TABLE IF NOT EXISTS alerts (
     alert_id INT AUTO_INCREMENT PRIMARY KEY,
     alert_type VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,

@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { verifyToken } = require('../middleware/authMiddleware');
+const { verifyToken, requireRole } = require('../middleware/authMiddleware');
+const { auditLogger } = require('../middleware/auditMiddleware');
+
+router.use(verifyToken, requireRole('admin'), auditLogger);
 
 // 1. Get user list (only safe columns)
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT id, username, role, created_at FROM users');
         res.json({ data: rows });
@@ -14,13 +17,13 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // 2. Update user role
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', async (req, res) => {
     try {
         const userId = req.params.id;
         const { role } = req.body;
 
-        if (!role) {
-            return res.status(400).json({ error: 'Please provide a new role!' });
+        if (!['admin', 'technician', 'user'].includes(role)) {
+            return res.status(400).json({ error: 'Invalid role.' });
         }
 
         const [result] = await db.query(
@@ -39,7 +42,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 });
 
 // 3. Delete user
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const userId = req.params.id;
 

@@ -1,5 +1,6 @@
 import { Activity, BellRing, ShieldCheck, Check, X, KeyRound } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { API_BASE_URL, authHeaders } from '../lib/api'
 
 const tabs = ['Người dùng', 'Ngưỡng cảnh báo', 'Luật tự động', 'Nhật ký thao tác'] as const
 type Tab = typeof tabs[number]
@@ -58,7 +59,7 @@ function UsersPanel({ isManager, onAction }: { isManager: boolean, onAction: (ms
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/auth/admin/users')
+      const res = await fetch(`${API_BASE_URL}/auth/admin/users`, { headers: authHeaders() })
       if (res.ok) setUsers(await res.json())
     } catch (error) {
       console.error('Lỗi lấy danh sách:', error)
@@ -75,16 +76,16 @@ function UsersPanel({ isManager, onAction }: { isManager: boolean, onAction: (ms
   const handleApproveUser = async (email: string, status: 'approved' | 'rejected') => {
     if (!isManager) return
     try {
-      const res = await fetch('http://localhost:3000/api/auth/approve-user', {
+      const res = await fetch(`${API_BASE_URL}/auth/approve-user`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ target_email: email, new_status: status })
       })
       if (res.ok) {
         onAction(`Đã ${status === 'approved' ? 'duyệt' : 'từ chối'} tài khoản ${email}`)
         fetchUsers()
       }
-    } catch (error) {
+    } catch {
       alert('Lỗi kết nối')
     }
   }
@@ -94,16 +95,16 @@ function UsersPanel({ isManager, onAction }: { isManager: boolean, onAction: (ms
     if (!isManager) return
     if (!window.confirm(`Gửi link đổi mật khẩu cho ${email}?`)) return
     try {
-      const res = await fetch('http://localhost:3000/api/auth/admin/approve-reset', {
+      const res = await fetch(`${API_BASE_URL}/auth/admin/approve-reset`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ target_email: email })
       })
       if (res.ok) {
         onAction(`Đã gửi link khôi phục MK cho ${email}`)
         fetchUsers()
       }
-    } catch (error) {
+    } catch {
       alert('Lỗi kết nối')
     }
   }

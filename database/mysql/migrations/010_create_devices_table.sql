@@ -1,4 +1,4 @@
-CREATE TABLE devices (
+CREATE TABLE IF NOT EXISTS devices (
     device_id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     type ENUM('RELAY', 'MOTOR') NOT NULL,

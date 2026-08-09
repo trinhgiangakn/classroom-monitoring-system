@@ -1,10 +1,13 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { RegistrationPage } from './RegistrationPage'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 function renderRegistrationPage() {
   return render(
@@ -28,6 +31,10 @@ describe('RegistrationPage', () => {
   })
 
   it('shows an approval-pending message after a valid registration request', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: 'Đăng ký thành công!' }),
+    }))
     const user = userEvent.setup()
     renderRegistrationPage()
 
@@ -41,6 +48,6 @@ describe('RegistrationPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Yêu cầu đã được gửi' }),
     ).toBeInTheDocument()
-    expect(screen.getByText(/đang chờ Manager phê duyệt/i)).toBeInTheDocument()
+    expect(screen.getByText(/đang chờ Admin phê duyệt/i)).toBeInTheDocument()
   })
 })

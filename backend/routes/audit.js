@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { verifyToken } = require('../middleware/authMiddleware');
+const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
 // Audit history API (requires a valid token)
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requireRole('admin'), async (req, res) => {
     try {
         const [logs] = await db.query(`
             SELECT id, user_id, action, details, created_at 

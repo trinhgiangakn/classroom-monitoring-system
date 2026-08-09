@@ -1,4 +1,4 @@
-CREATE TABLE system_events (
+CREATE TABLE IF NOT EXISTS system_events (
     event_id INT AUTO_INCREMENT PRIMARY KEY,
     service_id VARCHAR(50),
     event_type VARCHAR(50) NOT NULL,

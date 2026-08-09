@@ -2,6 +2,7 @@ import { LockKeyhole, CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AuthFrame } from '../components/auth/AuthFrame'
+import { API_BASE_URL } from '../lib/api'
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -33,7 +34,7 @@ export function ResetPasswordPage() {
     setError(undefined)
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/reset-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, token, newPassword: password })

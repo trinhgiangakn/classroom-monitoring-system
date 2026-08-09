@@ -11,9 +11,15 @@ import { RegistrationPage } from './pages/RegistrationPage'
 import { SystemStatusPage } from './pages/SystemStatusPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { clearSession, hasValidSession } from './lib/api'
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(hasValidSession)
+
+  const logout = () => {
+    clearSession()
+    setIsAuthenticated(false)
+  }
 
   return (
     <BrowserRouter>
@@ -34,7 +40,7 @@ function App() {
         <Route
           element={
             isAuthenticated ? (
-              <DashboardLayout onLogout={() => setIsAuthenticated(false)} />
+              <DashboardLayout onLogout={logout} />
             ) : (
               <Navigate replace to="/login" />
             )

@@ -3,30 +3,39 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 // Account creation API (used to test password hashing)
 router.post('/register', async (req, res) => {
-    const { full_name, email, username, password, role } = req.body;
+    const { full_name, email, username: requestedUsername, password, role } = req.body;
     try {
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email và password là bắt buộc!" });
+        const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+        if (!/^\S+@\S+\.\S+$/.test(normalizedEmail) || typeof password !== 'string' || password.length < 8) {
+            return res.status(400).json({ error: 'Email hợp lệ và mật khẩu ít nhất 8 ký tự là bắt buộc.' });
         }
 
-        const username = email.split('@')[0];
+        const usernameSource = typeof requestedUsername === 'string'
+            ? requestedUsername
+            : normalizedEmail.split('@')[0];
+        const username = usernameSource.trim();
+        if (!/^[A-Za-z0-9._-]{1,50}$/.test(username)) {
+            return res.status(400).json({ error: 'Tên đăng nhập không hợp lệ.' });
+        }
+
+        const requestedRole = ['user', 'technician'].includes(role) ? role : 'user';
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const [result] = await db.query(
             'INSERT INTO users (full_name, email, username, password_hash, role, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [full_name || 'Guest', email, username, hashedPassword, role || 'user', 'pending']
+            [full_name?.trim() || 'Guest', normalizedEmail, username, hashedPassword, requestedRole, 'pending']
         );
 
         await db.query(
             'INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [result.insertId, 'REGISTER', `Tạo tài khoản mới với email: ${email} (Chờ duyệt)`]
+            [result.insertId, 'REGISTER', `Tạo tài khoản mới với email: ${normalizedEmail} (Chờ duyệt)`]
         );
 
         res.status(201).json({ message: "Đăng ký thành công!", userId: result.insertId });
@@ -42,6 +51,13 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
+        if (!process.env.JWT_SECRET) {
+            return res.status(500).json({ error: 'JWT_SECRET is not configured.' });
+        }
+        if (typeof email !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ message: 'Email/username and password are required.' });
+        }
+
         const [users] = await db.query('SELECT * FROM users WHERE email = ? OR username = ?', [email, email]);
         if (users.length === 0) 
             return res.status(404).json({ message: "Account not found!" });
@@ -79,7 +95,13 @@ router.post('/login', async (req, res) => {
         res.json({
             message: "Login successful!",
             token: token,
-            role: user.role
+            role: user.role,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role
+            }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -87,7 +109,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Approve account (Admin only)
-router.put('/approve-user', async (req, res) => {
+router.put('/approve-user', verifyToken, requireRole('admin'), async (req, res) => {
     try {
         const { target_email, new_status } = req.body;
 
@@ -118,7 +140,7 @@ router.post('/forgot-password', async (req, res) => {
         // 1. Check whether the email exists
         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
         if (users.length === 0) {
-            return res.status(404).json({ error: 'No account was found with this email.' });
+            return res.json({ message: 'If the account exists, the request has been sent to an administrator.' });
         }
 
         // 2. Set a flag to notify the admin (reset_requested = 1)
@@ -137,6 +159,10 @@ router.post('/reset-password', async (req, res) => {
     const { email, token, newPassword } = req.body;
 
     try {
+        if (typeof email !== 'string' || typeof token !== 'string' || typeof newPassword !== 'string' || newPassword.length < 8) {
+            return res.status(400).json({ error: 'Email, token and a password of at least 8 characters are required.' });
+        }
+
         // Validate the reset token and its expiry time
         const [users] = await db.query(
             'SELECT * FROM users WHERE email = ? AND reset_token = ? AND reset_token_expiry > NOW()',
@@ -163,7 +189,7 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // Get all users who have requested a password reset (Admin only)
-router.get('/admin/reset-requests', async (req, res) => {
+router.get('/admin/reset-requests', verifyToken, requireRole('admin'), async (req, res) => {
     try {
         const [users] = await db.query(
             'SELECT id, full_name, email, role FROM users WHERE reset_requested = 1'
@@ -175,19 +201,24 @@ router.get('/admin/reset-requests', async (req, res) => {
 });
 
 // Create a reset token and send it to the user (Admin only)
-router.post('/admin/approve-reset', async (req, res) => {
+router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (req, res) => {
     const { target_email } = req.body;
 
     try {
         const resetToken = crypto.randomBytes(32).toString('hex');
         const expireTime = new Date(Date.now() + 15 * 60 * 1000); 
 
-        await db.query(
+        const [result] = await db.query(
             'UPDATE users SET reset_token = ?, reset_token_expiry = ?, reset_requested = 0 WHERE email = ?',
             [resetToken, expireTime, target_email]
         );
 
-        const resetLink = `http://localhost:5173/reset-password?token=${resetToken}&email=${target_email}`;
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(target_email)}`;
         
         console.log(`[ĐÃ DUYỆT] Link khôi phục của ${target_email} là:`);
         console.log(resetLink);
@@ -200,7 +231,7 @@ router.post('/admin/approve-reset', async (req, res) => {
 });
 
 // Get the full list of users for the Admin page
-router.get('/admin/users', async (req, res) => {
+router.get('/admin/users', verifyToken, requireRole('admin'), async (req, res) => {
     try {
         const [users] = await db.query(
             'SELECT id, full_name, username, email, role, status, reset_requested FROM users'

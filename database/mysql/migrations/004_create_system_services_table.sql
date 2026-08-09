@@ -1,4 +1,4 @@
-CREATE TABLE system_services (
+CREATE TABLE IF NOT EXISTS system_services (
     service_id VARCHAR(50) PRIMARY KEY,
     service_name VARCHAR(100) NOT NULL,
     status ENUM('ONLINE', 'OFFLINE', 'ERROR') DEFAULT 'OFFLINE',

@@ -1,4 +1,4 @@
-CREATE TABLE auth_sessions (
+CREATE TABLE IF NOT EXISTS auth_sessions (
     session_id VARCHAR(100) PRIMARY KEY,
     user_id INT NOT NULL,
     refresh_token TEXT NOT NULL,

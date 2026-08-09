@@ -1,4 +1,4 @@
-CREATE TABLE automation_rules (
+CREATE TABLE IF NOT EXISTS automation_rules (
     rule_id INT AUTO_INCREMENT PRIMARY KEY,
     rule_name VARCHAR(100) NOT NULL,
     conditions JSON NOT NULL, 

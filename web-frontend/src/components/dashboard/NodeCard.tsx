@@ -3,6 +3,7 @@ import type { SensorNode } from '../../types/dashboard'
 
 export function NodeCard({ node }: { node: SensorNode }) {
   const signalTone = node.status === 'Online' ? 'text-emerald-300' : 'text-amber-300'
+  const value = (measurement: number | null, unit: string) => measurement === null ? '—' : `${measurement} ${unit}`
 
   return (
     <article className="rounded-xl border border-slate-800 bg-[#091a32] p-4">
@@ -13,13 +14,13 @@ export function NodeCard({ node }: { node: SensorNode }) {
         </div>
         <span className={`flex items-center gap-1 text-xs font-semibold ${signalTone}`}>
           <Signal aria-hidden="true" className="size-4" />
-          {node.signalDbm} dBm
+          {node.signalDbm === null ? '—' : `${node.signalDbm} dBm`}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-y-2 text-xs">
-        <DataPair label="AHT20" value={`${node.temperature} °C · ${node.humidity}%`} />
-        <DataPair label="BMP280" value={`${node.pressure} hPa`} />
-        <DataPair label="BH1750" value={`${node.light} lux`} />
+        <DataPair label="AHT20" value={`${value(node.temperature, '°C')} · ${value(node.humidity, '%')}`} />
+        <DataPair label="BMP280" value={value(node.pressure, 'hPa')} />
+        <DataPair label="BH1750" value={value(node.light, 'lux')} />
         <DataPair label="MQ135" value={node.airQuality} />
       </div>
       <p className="mt-3 border-t border-slate-800 pt-3 text-xs text-slate-500">Cập nhật {node.lastSeen}</p>
