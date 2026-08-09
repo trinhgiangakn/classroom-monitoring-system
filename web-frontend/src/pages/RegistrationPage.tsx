@@ -64,12 +64,34 @@ export function RegistrationPage() {
     setErrors((current) => ({ ...current, [field]: undefined }))
   }
 
-  const submitRequest = () => {
+  const submitRequest = async () => {
     const nextErrors = validate(values)
     setErrors(nextErrors)
 
     if (Object.keys(nextErrors).length === 0) {
-      setSubmitted(true)
+      try {
+        const response = await fetch('http://localhost:3000/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: values.fullName, 
+            email: values.email,
+            password: values.password,
+            role: values.requestedRole  
+          })
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          setSubmitted(true)
+        } else {
+          setErrors({ email: data.error || data.message || 'Đăng ký thất bại từ máy chủ!' })
+        }
+      } catch (error) {
+        console.error('Lỗi kết nối Backend:', error)
+        alert('Không thể kết nối đến máy chủ Backend ở cổng 3000!')
+      }
     }
   }
 
@@ -80,10 +102,7 @@ export function RegistrationPage() {
           <CheckCircle2 aria-hidden="true" className="mx-auto size-12 text-emerald-300" />
           <h1 className="mt-5 text-2xl font-bold">Yêu cầu đã được gửi</h1>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            Tài khoản <span className="font-medium text-slate-200">{values.email}</span> đang chờ Manager phê duyệt.
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Đây là mô phỏng Frontend; yêu cầu chưa được gửi hoặc lưu trên hệ thống.
+            Tài khoản <span className="font-medium text-slate-200">{values.email}</span> đang chờ Admin phê duyệt.
           </p>
           <Link
             className="mt-7 inline-flex rounded-lg bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"
@@ -104,7 +123,7 @@ export function RegistrationPage() {
         </div>
         <h1 className="mt-5 text-2xl font-bold">Đăng ký tài khoản</h1>
         <p className="mt-2 text-sm leading-6 text-slate-400">
-          Gửi yêu cầu tạo tài khoản. Manager sẽ phê duyệt trước khi bạn có thể đăng nhập.
+          Gửi yêu cầu tạo tài khoản. Admin sẽ phê duyệt trước khi bạn có thể đăng nhập.
         </p>
 
         <form

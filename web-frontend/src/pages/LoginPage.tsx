@@ -1,4 +1,4 @@
-import { LockKeyhole, ShieldCheck } from 'lucide-react'
+import { LockKeyhole } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AuthFrame } from '../components/auth/AuthFrame'
@@ -13,11 +13,11 @@ interface LoginErrors {
 }
 
 export function LoginPage({ onDemoLogin }: LoginPageProps) {
-  const [identifier, setIdentifier] = useState('khanh.manager@smartclass.vn')
-  const [password, setPassword] = useState('demo12345')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<LoginErrors>({})
 
-  const submitLogin = () => {
+  const submitLogin = async () => {
     const nextErrors: LoginErrors = {}
 
     if (!identifier.trim()) {
@@ -31,8 +31,31 @@ export function LoginPage({ onDemoLogin }: LoginPageProps) {
     }
 
     setErrors(nextErrors)
+    
     if (Object.keys(nextErrors).length === 0) {
-      onDemoLogin()
+      try {
+        const response = await fetch('http://localhost:3000/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: identifier, 
+            password: password
+          })
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          localStorage.setItem('accessToken', data.token)
+          
+          onDemoLogin()
+        } else {
+          setErrors({ password: data.message || data.error || 'Đăng nhập thất bại!' })
+        }
+      } catch (error) {
+        console.error('Lỗi kết nối Backend:', error)
+        alert('Không thể kết nối đến máy chủ Backend ở cổng 3000!')
+      }
     }
   }
 
@@ -95,7 +118,9 @@ export function LoginPage({ onDemoLogin }: LoginPageProps) {
               <input className="accent-cyan-400" type="checkbox" />
               Ghi nhớ đăng nhập
             </label>
-            <span className="font-medium text-cyan-300">Quên mật khẩu?</span>
+            <Link className="font-medium text-cyan-300 hover:text-cyan-200" to="/forgot-password">
+            Quên mật khẩu?
+            </Link>
           </div>
 
           <button className="w-full rounded-lg bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300" type="submit">
@@ -109,15 +134,6 @@ export function LoginPage({ onDemoLogin }: LoginPageProps) {
             Đăng ký tài khoản
           </Link>
         </p>
-
-        <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/30 p-3 text-xs leading-5 text-slate-400">
-          <div className="flex items-center gap-2 font-medium text-slate-300">
-            <ShieldCheck aria-hidden="true" className="size-4 text-emerald-300" /> Phiên bản demo Frontend
-          </div>
-          <p className="mt-1">
-            Chưa gọi Backend, chưa lưu mật khẩu và chưa kết nối MQTT trực tiếp từ trình duyệt.
-          </p>
-        </div>
       </div>
     </AuthFrame>
   )

@@ -9,6 +9,8 @@ import { LoginPage } from './pages/LoginPage'
 import { MonitoringPage } from './pages/MonitoringPage'
 import { RegistrationPage } from './pages/RegistrationPage'
 import { SystemStatusPage } from './pages/SystemStatusPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -27,6 +29,8 @@ function App() {
           path="/login"
         />
         <Route element={<RegistrationPage />} path="/register" />
+        <Route element={<ForgotPasswordPage />} path="/forgot-password" />
+        <Route element={<ResetPasswordPage />} path="/reset-password" />
         <Route
           element={
             isAuthenticated ? (

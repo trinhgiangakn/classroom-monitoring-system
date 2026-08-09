@@ -1,0 +1,9 @@
+CREATE TABLE alerts (
+    alert_id INT AUTO_INCREMENT PRIMARY KEY,
+    alert_type VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    severity ENUM('INFO', 'WARNING', 'CRITICAL') DEFAULT 'INFO',
+    is_resolved BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL
+);

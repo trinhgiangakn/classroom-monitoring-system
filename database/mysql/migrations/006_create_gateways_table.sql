@@ -1,0 +1,8 @@
+CREATE TABLE gateways (
+    gateway_id VARCHAR(50) PRIMARY KEY,
+    mac_address VARCHAR(20) UNIQUE NOT NULL,
+    location VARCHAR(100),
+    status ENUM('ONLINE', 'OFFLINE') DEFAULT 'OFFLINE',
+    last_seen TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
