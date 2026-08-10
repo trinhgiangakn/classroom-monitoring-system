@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Test Client - DEV 3</title>
+    <!-- Import Socket.io client library from CDN -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        .status { font-weight: bold; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+        .online { background-color: #d4edda; color: #155724; }
+        .offline { background-color: #f8d7da; color: #721c24; }
+        #logs { background: #1e1e1e; color: #00ff00; padding: 15px; font-family: monospace; height: 300px; overflow-y: auto; border-radius: 5px; }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 3px; }
+    </style>
+</head>
+<body>
+    <h2> Classroom P.101 Real-time WebSocket Tester</h2>
+    
+    <div class="card">
+        Connection Status: <span id="connectionStatus" class="status offline">OFFLINE</span>
+    </div>
+
+    <div class="card">
+        <h3>Live Event Logs</h3>
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        // Connect to local Socket.io server
+        const socket = io('http://localhost:5000');
+
+        const statusEl = document.getElementById('connectionStatus');
+        const logsEl = document.getElementById('logs');
+
+        function appendLog(eventName, data) {
+            const time = new Date().toLocaleTimeString();
+            const logItem = document.createElement('div');
+            logItem.className = 'log-entry';
+            logItem.innerHTML = `<span style="color: #888;">[${time}]</span> <b style="color: #569cd6;">[${eventName}]</b>: ${JSON.stringify(data)}`;
+            logsEl.prepend(logItem);
+        }
+
+        socket.on('connect', () => {
+            statusEl.innerText = `CONNECTED (${socket.id})`;
+            statusEl.className = 'status online';
+            appendLog('SYSTEM', { message: 'Successfully connected to WebSocket server and joined room P.101' });
+        });
+
+        socket.on('disconnect', () => {
+            statusEl.innerText = 'DISCONNECTED';
+            statusEl.className = 'status offline';
+            appendLog('SYSTEM', { message: 'Disconnected from WebSocket server' });
+        });
+
+        // Listen for WebSocket Events
+        socket.on('device:command-update', (data) => {
+            appendLog('device:command-update', data);
+        });
+
+        socket.on('device:status', (data) => {
+            appendLog('device:status', data);
+        });
+
+        socket.on('curtain:status', (data) => {
+            appendLog('curtain:status', data);
+        });
+    </script>
+</body>
+</html>
