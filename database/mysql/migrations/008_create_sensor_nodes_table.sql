@@ -1,0 +1,2 @@
+-- Superseded by database/mysql/schema.sql.
+-- The canonical sensor node schema is owned by the Dev 2 module.
