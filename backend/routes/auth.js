@@ -15,15 +15,21 @@ function getMailTransporter() {
         throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS.');
     }
 
-    const isGmail = (SMTP_HOST && SMTP_HOST.includes('gmail')) || (SMTP_USER && SMTP_USER.endsWith('@gmail.com')) || SMTP_SERVICE === 'gmail';
+    const cleanUser = (SMTP_USER || '').trim();
+    const cleanPass = (SMTP_PASS || '').replace(/\s+/g, '');
+
+    const isGmail = (SMTP_HOST && SMTP_HOST.includes('gmail')) || cleanUser.endsWith('@gmail.com') || SMTP_SERVICE === 'gmail';
 
     if (isGmail) {
         return nodemailer.createTransport({
             service: 'gmail',
             auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS,
+                user: cleanUser,
+                pass: cleanPass,
             },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
         });
     }
 
@@ -32,9 +38,12 @@ function getMailTransporter() {
         port: Number(SMTP_PORT || 465),
         secure: SMTP_SECURE === 'true' || Number(SMTP_PORT) === 465,
         auth: {
-            user: SMTP_USER,
-            pass: SMTP_PASS,
+            user: cleanUser,
+            pass: cleanPass,
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
     });
 }
 
@@ -288,8 +297,11 @@ router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (re
         console.log(`[ĐÃ DUYỆT] Link khôi phục của ${recipientEmail} là: ${resetLink}`);
         try {
             const transporter = getMailTransporter();
-            await transporter.sendMail({
-                from: process.env.MAIL_FROM || process.env.SMTP_USER,
+            const senderUser = (process.env.SMTP_USER || '').trim();
+            const senderFrom = process.env.MAIL_FROM ? process.env.MAIL_FROM.replace(/^"|"$/g, '') : `Smart Classroom <${senderUser}>`;
+
+            const mailInfo = await transporter.sendMail({
+                from: senderFrom,
                 to: recipientEmail,
                 subject: 'Smart Classroom - Yêu cầu khôi phục mật khẩu',
                 text: `Sử dụng liên kết này để đặt lại mật khẩu cho tài khoản Smart Classroom của bạn: ${resetLink}`,
@@ -308,13 +320,14 @@ router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (re
                 </div>
                 `,
             });
+            console.log(`[APPROVE-RESET] Gửi email thành công cho ${recipientEmail}:`, mailInfo.response);
         } catch (mailError) {
             await db.query(
                 'UPDATE users SET reset_token = NULL, reset_token_expiry = NULL, reset_requested = 1 WHERE email = ?',
                 [recipientEmail]
             );
             console.error('Password reset email could not be sent:', mailError.message);
-            return res.status(502).json({ error: 'Could not send reset email. Check SMTP configuration.' });
+            return res.status(502).json({ error: 'Could not send reset email. Check SMTP configuration: ' + mailError.message });
         }
 
         res.json({ message: `Đã gửi email cấp lại mật khẩu thành công cho ${recipientEmail}!` });
