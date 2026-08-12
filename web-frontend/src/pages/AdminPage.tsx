@@ -100,12 +100,16 @@ function UsersPanel({ isManager, onAction }: { isManager: boolean, onAction: (ms
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ target_email: email })
       })
+      const data = await res.json()
       if (res.ok) {
+        alert(data.message || `Đã gửi link khôi phục MK thành công cho ${email}`)
         onAction(`Đã gửi link khôi phục MK cho ${email}`)
         fetchUsers()
+      } else {
+        alert(data.error || data.message || 'Lỗi gửi mail!')
       }
     } catch {
-      alert('Lỗi kết nối')
+      alert('Lỗi kết nối đến máy chủ Backend')
     }
   }
 
