@@ -58,9 +58,18 @@ async function createApp({
 } = {}) {
     const app = express();
 
-    // Configure CORS policy for frontend client access
+    // Configure CORS policy for frontend client access (supports Vercel, localhost, and custom domains)
     app.use(cors({
-        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        origin: (origin, callback) => {
+            if (!origin) return callback(null, true);
+            if (origin.endsWith('.vercel.app') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+                return callback(null, true);
+            }
+            if (process.env.FRONTEND_URL && (process.env.FRONTEND_URL === '*' || process.env.FRONTEND_URL.includes(origin))) {
+                return callback(null, true);
+            }
+            return callback(null, true);
+        },
         credentials: true,
     }));
     app.use(express.json({ limit: '1mb' }));
