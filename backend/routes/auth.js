@@ -9,16 +9,28 @@ const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 function getMailTransporter() {
-    const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
+    const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_SERVICE } = process.env;
 
-    if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
-        throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS.');
+    if (!SMTP_USER || !SMTP_PASS) {
+        throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS.');
+    }
+
+    const isGmail = (SMTP_HOST && SMTP_HOST.includes('gmail')) || (SMTP_USER && SMTP_USER.endsWith('@gmail.com')) || SMTP_SERVICE === 'gmail';
+
+    if (isGmail) {
+        return nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: SMTP_USER,
+                pass: SMTP_PASS,
+            },
+        });
     }
 
     return nodemailer.createTransport({
-        host: SMTP_HOST,
-        port: Number(SMTP_PORT),
-        secure: SMTP_SECURE === 'true',
+        host: SMTP_HOST || 'smtp.gmail.com',
+        port: Number(SMTP_PORT || 465),
+        secure: SMTP_SECURE === 'true' || Number(SMTP_PORT) === 465,
         auth: {
             user: SMTP_USER,
             pass: SMTP_PASS,
