@@ -155,7 +155,9 @@ ON DUPLICATE KEY UPDATE
   received_at = VALUES(received_at);
 
 INSERT INTO users (full_name, email, username, password_hash, role, status) VALUES
-  ('Bảo Khánh Admin', 'baokhanhdtm@gmail.com', 'baokhanhdtm', '$2b$10$tZ20S4118sOiygSjGZz.jux.66a.uC/5YmZvhZ0E1jD.2E0Wc5u/.', 'admin', 'approved')
+  ('Bảo Khánh Admin', 'baokhanhdtm@gmail.com', 'baokhanhdtm', '$2b$10$tZ20S4118sOiygSjGZz.jux.66a.uC/5YmZvhZ0E1jD.2E0Wc5u/.', 'admin', 'approved'),
+  ('Bảo Khánh User', 'nguyenquangbaokhanh01062005@gmail.com', 'nguyenquangbaokhanh01062005', '$2b$10$tZ20S4118sOiygSjGZz.jux.66a.uC/5YmZvhZ0E1jD.2E0Wc5u/.', 'user', 'approved'),
+  ('Lê Thanh Hoàng', 'vuhuyhoang1006@gmail.com', 'vuhuyhoang1006', '$2b$10$tZ20S4118sOiygSjGZz.jux.66a.uC/5YmZvhZ0E1jD.2E0Wc5u/.', 'technician', 'approved')
 ON DUPLICATE KEY UPDATE status = 'approved';
 
 COMMIT;
