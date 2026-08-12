@@ -90,8 +90,8 @@ export function RegistrationPage() {
           setErrors({ email: data.error || data.message || 'Đăng ký thất bại từ máy chủ!' })
         }
       } catch (error) {
-        console.error('Lỗi kết nối Backend:', error)
-        alert('Không thể kết nối đến máy chủ Backend ở cổng 3000!')
+        console.error('Lỗi đăng ký tài khoản:', error)
+        alert(`Không thể kết nối đến máy chủ Backend (${API_BASE_URL})!`)
       }
     }
   }

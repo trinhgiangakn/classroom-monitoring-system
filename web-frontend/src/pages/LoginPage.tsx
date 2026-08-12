@@ -56,7 +56,7 @@ export function LoginPage({ onDemoLogin }: LoginPageProps) {
         }
       } catch (error) {
         console.error('Lỗi kết nối Backend:', error)
-        alert('Không thể kết nối đến máy chủ Backend ở cổng 3000!')
+        alert(`Không thể kết nối đến máy chủ Backend (${API_BASE_URL})!`)
       }
     }
   }
