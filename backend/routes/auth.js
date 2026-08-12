@@ -141,107 +141,16 @@ router.put('/approve-user', verifyToken, requireRole('admin'), async (req, res) 
             [new_status, target_email]
         );
 
-
-// Account creation API (used to test password hashing)
-router.post('/register', async (req, res) => {
-    const { full_name, email, username: requestedUsername, password, role } = req.body;
-    try {
-        const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-        if (!/^\S+@\S+\.\S+$/.test(normalizedEmail) || typeof password !== 'string' || password.length < 8) {
-            return res.status(400).json({ error: 'Email hợp lệ và mật khẩu ít nhất 8 ký tự là bắt buộc.' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Account not found!' });
         }
 
-        const usernameSource = typeof requestedUsername === 'string'
-            ? requestedUsername
-            : normalizedEmail.split('@')[0];
-        const username = usernameSource.trim();
-        if (!/^[A-Za-z0-9._-]{1,50}$/.test(username)) {
-            return res.status(400).json({ error: 'Tên đăng nhập không hợp lệ.' });
-        }
-
-        const requestedRole = ['user', 'technician'].includes(role) ? role : 'user';
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const [result] = await db.query(
-            'INSERT INTO users (full_name, email, username, password_hash, role, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [full_name?.trim() || 'Guest', normalizedEmail, username, hashedPassword, requestedRole, 'pending']
-        );
-
-        await db.query(
-            'INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [result.insertId, 'REGISTER', `Tạo tài khoản mới với email: ${normalizedEmail} (Chờ duyệt)`]
-        );
-
-        res.status(201).json({ message: "Đăng ký thành công!", userId: result.insertId });
-    } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ error: "Email hoặc tài khoản này đã tồn tại!" });
-        }
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Login API and issue token
-router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    try {
-        if (!process.env.JWT_SECRET) {
-            return res.status(500).json({ error: 'JWT_SECRET is not configured.' });
-        }
-        if (typeof email !== 'string' || typeof password !== 'string') {
-            return res.status(400).json({ message: 'Email/username and password are required.' });
-        }
-
-        const [users] = await db.query('SELECT * FROM users WHERE email = ? OR username = ?', [email, email]);
-        if (users.length === 0) 
-            return res.status(404).json({ message: "Account not found!" });
-
-        const user = users[0];
-
-        if (user.status === 'pending') {
-            return res.status(403).json({ message: "Your account is pending admin approval." });
-        }
-        if (user.status === 'rejected') {
-            return res.status(403).json({ message: "Your account has been rejected." });
-        }
-
-        // Compare the supplied password with the hashed password in the database
-        const validPassword = await bcrypt.compare(password, user.password_hash);
-        if (!validPassword) 
-            return res.status(401).json({ message: "Incorrect password!" });
-
-        const token = jwt.sign(
-            { 
-                id: user.id, 
-                role: user.role, 
-                username: user.username,
-                email: user.email
-             },
-            process.env.JWT_SECRET,
-            { expiresIn: '12h' }
-        );
-
-        await db.query(
-            'INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [user.id, 'LOGIN', 'Đăng nhập thành công vào hệ thống']
-        );
-
-        res.json({
-            message: "Login successful!",
-            token: token,
-            role: user.role,
-            user: {
-                id: user.id,
-                username: user.username,
-                email: user.email,
-                role: user.role
-            }
-        });
+        res.json({ message: `Updated account ${target_email} to ${new_status}.` });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
 
 // Approve account (Admin only)
 router.put('/approve-user', verifyToken, requireRole('admin'), async (req, res) => {
@@ -395,6 +304,11 @@ router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (re
             console.error('Password reset email could not be sent:', mailError.message);
             return res.status(502).json({ error: 'Could not send reset email. Check SMTP configuration.' });
         }
+
+        res.json({ message: `Đã gửi email cấp lại mật khẩu thành công cho ${recipientEmail}!` });
+    } catch (error) {
+        res.status(500).json({ error: "Lỗi hệ thống: " + error.message });
+    }
 });
 
 // Get the full list of users for the Admin page
