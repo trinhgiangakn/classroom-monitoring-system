@@ -177,7 +177,13 @@ export class IotService {
       })
     }
 
-    return { duplicate: !result.inserted, events }
+    // The record is returned only for a newly persisted packet.  Consumers such
+    // as the automation module must never evaluate duplicate QoS 1 deliveries.
+    return {
+      duplicate: !result.inserted,
+      events,
+      telemetry: result.inserted ? record : null,
+    }
   }
 
   async ingestNodeStatus(value, context) {
@@ -226,6 +232,19 @@ export class IotService {
       roomId: node.room_id,
       nodeId: node.node_id,
       payload: buildNodeStatusEvent(node, this.now()),
+    }))
+  }
+
+  /**
+   * Internal integration projection for DEV 4 Safe Mode.  This intentionally
+   * returns raw status codes instead of UI-formatted Vietnamese labels.
+   */
+  async nodeStatuses(roomId) {
+    const rows = await this.repository.getNodes(roomId)
+    return rows.map((row) => ({
+      roomId,
+      nodeId: row.node_id,
+      status: row.node_status ?? row.status,
     }))
   }
 }

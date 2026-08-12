@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { COMPARISON, RULE_ACTION } = require('../automation.constants');
-const { evaluateRule } = require('../rule-evaluator');
+const { evaluateRule, evaluateWeatherAdvisory } = require('../rule-evaluator');
 
 const rule = {
   id: 'RULE_FAN', roomId: 'P.101', deviceId: 'RELAY_2', sensor: 'temperature', enabled: true,
@@ -30,4 +30,23 @@ test('issues TURN_ON after telemetry condition remains true for delay period', (
 test('holds active device inside hysteresis band', () => {
   const result = evaluateRule(rule, { ...telemetry, temperature: 29 }, { isActive: true }, new Date());
   assert.equal(result.decision, 'HOLD');
+});
+
+test('matches an advisory only when the configured outdoor weather threshold is met', () => {
+  const result = evaluateWeatherAdvisory(
+    {
+      ...rule,
+      weatherAdvisory: {
+        field: 'temperatureC',
+        comparison: COMPARISON.GTE,
+        threshold: 34,
+        severity: 'INFO',
+        message: 'Outdoor heat advisory',
+      },
+    },
+    { temperatureC: 34.2, fetchedAt: new Date('2026-08-11T10:05:00Z') },
+  );
+
+  assert.equal(result.matches, true);
+  assert.equal(result.message, 'Outdoor heat advisory');
 });

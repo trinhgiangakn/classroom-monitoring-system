@@ -25,6 +25,36 @@ function matches(value, comparison, threshold) {
   }
 }
 
+function readWeatherValue(weather, field) {
+  const values = {
+    temperatureC: weather?.temperatureC,
+    humidityPercent: weather?.humidityPercent,
+    precipitationProbability: weather?.precipitationProbability,
+    precipitationMm: weather?.precipitationMm,
+    windSpeedKmh: weather?.windSpeedKmh,
+    weatherCode: weather?.weatherCode,
+  };
+  return values[field];
+}
+
+/**
+ * Weather is advisory-only context. This evaluator never creates a device action.
+ */
+function evaluateWeatherAdvisory(rule, weather) {
+  const advisory = rule.weatherAdvisory;
+  if (!advisory || !weather) return { matches: false };
+
+  const value = readWeatherValue(weather, advisory.field);
+  if (!Number.isFinite(value)) return { matches: false };
+
+  return {
+    matches: matches(value, advisory.comparison, Number(advisory.threshold)),
+    value,
+    severity: advisory.severity ?? 'INFO',
+    message: advisory.message ?? `Weather advisory for ${advisory.field}`,
+  };
+}
+
 /**
  * Framework-independent Rule Engine logic for one rule.
  * Rule shape: { id, sensor, enabled, activation, deactivation, delayMs }.
@@ -88,4 +118,10 @@ function evaluateRule(rule, telemetry, currentState, now) {
   };
 }
 
-module.exports = { evaluateRule, matches, readSensorValue };
+module.exports = {
+  evaluateRule,
+  evaluateWeatherAdvisory,
+  matches,
+  readSensorValue,
+  readWeatherValue,
+};

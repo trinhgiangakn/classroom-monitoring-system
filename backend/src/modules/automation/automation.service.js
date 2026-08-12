@@ -1,6 +1,11 @@
 const { REALTIME_EVENT } = require('../realtime/realtime.events');
 const { ALERT_SEVERITY } = require('../alerts/alert.constants');
-const { evaluateRule } = require('./rule-evaluator');
+const {
+  evaluateRule,
+  evaluateWeatherAdvisory,
+  matches,
+  readSensorValue,
+} = require('./rule-evaluator');
 const { evaluateSafeMode, SAFE_MODE_STATE } = require('./safe-mode.service');
 
 /**
@@ -16,6 +21,7 @@ class AutomationService {
     this.deviceCommands = deviceCommands;
     this.runtimeStates = new Map();
     this.safeModesByRoom = new Map();
+    this.weatherAdvisoryFetchedAtByRule = new Map();
   }
 
   async handleNodeStatuses(roomId, statuses) {
@@ -45,23 +51,32 @@ class AutomationService {
    * Entry point called by DEV 2 only after a telemetry packet has been validated and persisted.
    * `mode` is kept as a temporary alias for `operationMode` during integration.
    */
-  async handleTelemetry({ roomId, operationMode, mode, rule, telemetry, validNodeCount, now = new Date() }) {
+  async handleTelemetry({ roomId, operationMode, mode, rule, telemetry, validNodeCount, weather, now = new Date() }) {
     const effectiveRoomId = roomId ?? rule.roomId;
     const effectiveMode = operationMode ?? mode;
     const minValidNodes = rule.minValidNodes ?? 2;
+
+    const weatherAdvisory = await this.createWeatherAdvisory({
+      roomId: effectiveRoomId,
+      rule,
+      telemetry,
+      weather,
+      validNodeCount,
+      minValidNodes,
+    });
 
     if (
       effectiveMode !== 'AUTO'
       || this.getSafeMode(effectiveRoomId) === SAFE_MODE_STATE.SAFE_MODE
       || validNodeCount < minValidNodes
     ) {
-      return undefined;
+      return weatherAdvisory;
     }
 
     const state = this.runtimeStates.get(rule.id) ?? { isActive: false };
     const evaluation = evaluateRule(rule, telemetry, state, now);
     this.runtimeStates.set(rule.id, evaluation.nextState);
-    if (!evaluation.action) return undefined;
+    if (!evaluation.action) return weatherAdvisory;
 
     const baseAction = {
       ruleId: rule.id,
@@ -76,6 +91,45 @@ class AutomationService {
     const action = { ...baseAction, ...command };
     this.realtime.publishToRoom(effectiveRoomId, { event: REALTIME_EVENT.AUTOMATION_ACTION, data: action });
     return action;
+  }
+
+  async createWeatherAdvisory({ roomId, rule, telemetry, weather, validNodeCount, minValidNodes }) {
+    if (!rule.enabled || !weather || validNodeCount < minValidNodes) return undefined;
+
+    const indoorValue = readSensorValue(telemetry, rule.sensor);
+    if (
+      indoorValue === undefined
+      || !matches(indoorValue, rule.activation.comparison, rule.activation.threshold)
+    ) {
+      return undefined;
+    }
+
+    const evaluation = evaluateWeatherAdvisory(rule, weather);
+    if (!evaluation.matches || !weather.fetchedAt) return undefined;
+
+    const fetchedAt = new Date(weather.fetchedAt);
+    if (Number.isNaN(fetchedAt.getTime())) return undefined;
+
+    const snapshotKey = fetchedAt.toISOString();
+    if (this.weatherAdvisoryFetchedAtByRule.get(rule.id) === snapshotKey) return undefined;
+
+    const alert = await this.alerts.create({
+      roomId,
+      severity: evaluation.severity,
+      source: 'WEATHER_ADVISORY',
+      message: evaluation.message,
+      metadata: {
+        ruleId: rule.id,
+        outdoor: {
+          field: rule.weatherAdvisory.field,
+          value: evaluation.value,
+          fetchedAt: snapshotKey,
+        },
+      },
+    });
+    this.weatherAdvisoryFetchedAtByRule.set(rule.id, snapshotKey);
+    this.realtime.publishToRoom(roomId, { event: REALTIME_EVENT.ALERT_NEW, data: alert });
+    return { type: 'WEATHER_ADVISORY', alert };
   }
 
   /**

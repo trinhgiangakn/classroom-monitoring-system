@@ -1,7 +1,5 @@
 const deviceService = require('../services/deviceService');
-
-// In-memory store for pending command timers (5-second ACK timeout tracking)
-const pendingTimers = new Map();
+const { DeviceCommandError } = require('../services/deviceCommandService');
 
 /**
  * GET /api/devices
@@ -72,87 +70,32 @@ async function controlDevice(req, res) {
     try {
         const deviceId = req.params.id;
         const { action } = req.body;
-
-        // Retrieve requesting username from JWT auth middleware, fallback to test user
-        const requestedBy = (req.user && req.user.username) ? req.user.username : 'manager_test';
-
-        // 1. Verify target device existence
-        const device = await deviceService.getDeviceById(deviceId);
-        if (!device) {
-            return res.status(404).json({ success: false, message: 'Device not found' });
+        const commandService = req.app.get('deviceCommandService');
+        if (!commandService) {
+            throw new DeviceCommandError('Device command service is unavailable', 503);
         }
-
-        // 2. Validate room operation mode (Reject manual controls in AUTO mode)
-        if (device.operation_mode === 'AUTO') {
-            return res.status(403).json({
-                success: false,
-                message: 'Room is currently in AUTO mode. Switch to MANUAL mode before issuing manual controls.'
-            });
-        }
-
-        // 3. Generate unique command identifier
-        const commandId = `CMD-${Date.now()}`;
-
-        // 4. Persist command log entry with default PENDING status
-        await deviceService.createCommand({
-            commandId,
+        const command = await commandService.dispatch({
             deviceId,
             action,
-            requestedBy,
-            source: 'MANUAL'
+            source: 'MANUAL',
+            requestedBy: req.user?.username,
         });
 
-        // 5. [MQTT PUBLISH] Dispatch command payload to ESP32 Gateway via MQTT Service
-        try {
-            const mqttService = require('../services/mqttService');
-            mqttService.publishCommand(deviceId, {
-                command_id: commandId,
-                device_id: deviceId,
-                action: action,
-                requested_by: requestedBy,
-                timestamp: Math.floor(Date.now() / 1000)
-            });
-        } catch (mqttErr) {
-            console.warn('MQTT Service unavailable (To be integrated in Step 3):', mqttErr.message);
-        }
-
-        // 6. Schedule 5-second ACK execution timeout
-        const timer = setTimeout(async () => {
-            const isUpdated = await deviceService.updateCommandTimeout(commandId);
-            if (isUpdated) {
-                console.warn(` [TIMEOUT] Command ${commandId} sent to ${deviceId} expired after 5s without ESP32 ACK`);
-                
-                // Broadcast WebSocket timeout event if WebSocket instance is bound
-                const io = req.app.get('io');
-                if (io) {
-                    io.to('P.101').emit('device:command-update', {
-                        command_id: commandId,
-                        device_id: deviceId,
-                        device_name: device.name,
-                        action: action,
-                        ack_status: 'TIMEOUT',
-                        execution_time_ms: null
-                    });
-                }
-            }
-            pendingTimers.delete(commandId);
-        }, 5000);
-
-        pendingTimers.set(commandId, timer);
-
-        // 7. Return HTTP 202 Accepted response to Web Frontend
         return res.status(202).json({
             success: true,
             message: 'Control command accepted, waiting for ESP32 ACK response',
             data: {
-                command_id: commandId,
-                device_id: deviceId,
-                action: action,
-                status: 'PENDING'
+                command_id: command.commandId,
+                device_id: command.deviceId,
+                action: command.action,
+                status: command.status,
             }
         });
 
     } catch (error) {
+        if (error instanceof DeviceCommandError) {
+            return res.status(error.statusCode).json({ success: false, message: error.message });
+        }
         console.error('Error in controlDevice:', error);
         return res.status(500).json({ success: false, message: 'Internal server error' });
     }
@@ -200,5 +143,4 @@ module.exports = {
     controlDevice,
     getDeviceCommands,
     getDeviceCommandById,
-    pendingTimers
 };

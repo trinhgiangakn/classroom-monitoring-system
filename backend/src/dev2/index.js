@@ -12,6 +12,8 @@ export function createDev2Module({
   afterAuthenticate,
   mqttClient = null,
   publishWebSocket,
+  onTelemetryPersisted,
+  onNodeStatusesChanged,
   logger = console,
   now,
   timeZone,
@@ -25,12 +27,21 @@ export function createDev2Module({
   const service = new IotService(repository, { now, timeZone, airQualityClassifier })
   const controller = new IotController(service)
   const router = createDev2Router({ Router, authenticate, afterAuthenticate, controller })
-  const jobs = new Dev2Jobs({ repository, service, publish: publishWebSocket, logger, now })
+  const jobs = new Dev2Jobs({
+    repository,
+    service,
+    publish: publishWebSocket,
+    onNodeStatusesChanged,
+    logger,
+    now,
+  })
   const mqtt = mqttClient
     ? new MqttIngestion({
         client: mqttClient,
         service,
         publish: publishWebSocket,
+        onTelemetryPersisted,
+        onNodeStatusesChanged,
         logger,
       })
     : null

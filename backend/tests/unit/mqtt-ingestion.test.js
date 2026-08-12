@@ -77,3 +77,31 @@ test('publishes the exact service event to the Dev 4 adapter', async () => {
     { roomId: 'P.101', nodeId: 'NODE-NW' },
   ]])
 })
+
+test('forwards only newly persisted telemetry to the automation integration hook', async () => {
+  const client = new FakeMqttClient()
+  const automationInputs = []
+  const service = {
+    ingestTelemetry: async () => ({
+      events: [],
+      telemetry: { roomId: 'P.101', nodeId: 'NODE-NW', temperature: 31 },
+    }),
+  }
+  const ingestion = new MqttIngestion({
+    client,
+    service,
+    publish: async () => {},
+    onTelemetryPersisted: async (input) => automationInputs.push(input),
+  })
+
+  await ingestion.handleMessage(
+    'classroom/P.101/sensor/NODE-NW/telemetry',
+    Buffer.from('{"room_id":"P.101"}'),
+  )
+
+  assert.deepEqual(automationInputs, [{
+    roomId: 'P.101',
+    nodeId: 'NODE-NW',
+    telemetry: { roomId: 'P.101', nodeId: 'NODE-NW', temperature: 31 },
+  }])
+})

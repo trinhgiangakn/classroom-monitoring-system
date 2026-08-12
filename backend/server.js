@@ -25,6 +25,20 @@ const { verifyToken } = require('./middleware/authMiddleware');
 const { auditLogger } = require('./middleware/auditMiddleware');
 const { attachMqttIngestion, createMqttClient } = require('./config/mqtt');
 const mqttService = require('./src/services/mqttService');
+const { createRealtimePublisher } = require('./src/modules/realtime/realtime.publisher');
+const deviceService = require('./src/services/deviceService');
+const { DeviceCommandService } = require('./src/services/deviceCommandService');
+const { AlertService } = require('./src/modules/alerts/alert.service');
+const { MySqlAlertRepository } = require('./src/modules/alerts/mysql-alert.repository');
+const { AutomationService } = require('./src/modules/automation/automation.service');
+const { AutomationRuntime } = require('./src/modules/automation/automation-runtime');
+const { MySqlAutomationRepository } = require('./src/modules/automation/mysql-automation.repository');
+const { createWeatherRouter } = require('./src/modules/weather/weather.routes');
+const { OpenMeteoProvider } = require('./src/modules/weather/open-meteo.provider');
+const { MySqlWeatherRepository } = require('./src/modules/weather/mysql-weather.repository');
+const { WeatherContextService } = require('./src/modules/weather/weather-context.service');
+const { WeatherSyncJob } = require('./src/modules/weather/weather-sync.job');
+const { REALTIME_EVENT } = require('./src/modules/realtime/realtime.events');
 
 /**
  * Configures and instantiates the Express application.
@@ -37,6 +51,9 @@ const mqttService = require('./src/services/mqttService');
 async function createApp({
     mqttClient = null,
     publishWebSocket = async () => {},
+    onTelemetryPersisted = async () => {},
+    onNodeStatusesChanged = async () => {},
+    weatherContext = null,
     logger = console,
 } = {}) {
     const app = express();
@@ -68,6 +85,15 @@ async function createApp({
     // Register Dev 3 device control API routes
     app.use('/api', deviceRoutes);
 
+    if (weatherContext) {
+        app.use('/api', createWeatherRouter({
+            Router: express.Router,
+            authenticate: verifyToken,
+            afterAuthenticate: auditLogger,
+            weatherContext,
+        }));
+    }
+
     // Dynamic import and initialization of Dev 2 telemetry and analytics module
     const { createDev2Module, toErrorResponse } = await import('./src/dev2/index.js');
     const dev2 = createDev2Module({
@@ -77,6 +103,8 @@ async function createApp({
         afterAuthenticate: auditLogger,
         mqttClient,
         publishWebSocket,
+        onTelemetryPersisted,
+        onNodeStatusesChanged,
         logger,
     });
 
@@ -106,8 +134,30 @@ async function startServer(options = {}) {
     const mqttClient = Object.prototype.hasOwnProperty.call(options, 'mqttClient')
         ? options.mqttClient
         : createMqttClient({ logger });
+    const weatherContext = options.weatherContext || new WeatherContextService({
+        provider: options.weatherProvider || new OpenMeteoProvider(),
+        repository: options.weatherRepository || new MySqlWeatherRepository(database),
+    });
 
-    const { app, dev2 } = await createApp({ ...options, logger, mqttClient });
+    // DEV 2 receives this adapter before Socket.io exists. It becomes active as
+    // soon as the single Socket.io instance below has been created.
+    let realtime = null;
+    let automationRuntime = null;
+    const publishWebSocket = options.publishWebSocket || (async (event, data) => {
+        if (!realtime) return undefined;
+        const roomId = data?.room_id || data?.roomId || 'P.101';
+        return realtime.publishToRoom(roomId, { event, data });
+    });
+
+    const { app, dev2 } = await createApp({
+        ...options,
+        logger,
+        mqttClient,
+        weatherContext,
+        publishWebSocket,
+        onTelemetryPersisted: async (input) => automationRuntime?.handleTelemetry(input),
+        onNodeStatusesChanged: async (input) => automationRuntime?.handleNodeStatuses(input),
+    });
 
     // Wrap Express application with HTTP server to attach Socket.io (Dev 3)
     const server = http.createServer(app);
@@ -116,6 +166,40 @@ async function startServer(options = {}) {
     });
 
     app.set('io', io);
+    realtime = createRealtimePublisher(io);
+    app.set('realtime', realtime);
+    app.set('weatherContext', weatherContext);
+    const weatherJob = options.weatherJob || new WeatherSyncJob({
+        weatherContext,
+        logger,
+        publish: async (snapshot) => realtime.publishToRoom(snapshot.roomId, {
+            event: REALTIME_EVENT.WEATHER_UPDATE,
+            data: snapshot,
+        }),
+    });
+    app.set('weatherJob', weatherJob);
+    const deviceCommandService = new DeviceCommandService({
+        app,
+        devices: deviceService,
+        publishCommand: mqttService.publishCommand,
+        logger,
+    });
+    app.set('deviceCommandService', deviceCommandService);
+
+    const alertService = new AlertService(new MySqlAlertRepository(database));
+    const automationService = new AutomationService({
+        alerts: alertService,
+        realtime,
+        deviceCommands: deviceCommandService,
+    });
+    automationRuntime = new AutomationRuntime({
+        automationService,
+        repository: new MySqlAutomationRepository(database),
+        weatherContext,
+        logger,
+    });
+    app.set('automationService', automationService);
+    app.set('automationRuntime', automationRuntime);
 
     // Manage WebSocket connections and room subscriptions
     io.on('connection', (socket) => {
@@ -128,12 +212,14 @@ async function startServer(options = {}) {
         });
     });
 
-    // Initialize Dev 3 MQTT device control service
-    mqttService.initMQTT(app);
+    // DEV 2 and DEV 3 share this one MQTT connection. DEV 3 only registers
+    // command/ACK handlers; it must not create a second broker connection.
+    const stopDeviceMqtt = mqttService.initMQTT({ app, mqttClient, logger });
 
     const port = Number(process.env.PORT || 3000);
     server.listen(port, () => {
         console.log(`Backend server is running at: http://localhost:${port}`);
+        weatherJob.start();
     });
 
     // Start background cron jobs if enabled in environment
@@ -147,8 +233,10 @@ async function startServer(options = {}) {
      * Gracefully shuts down all active background jobs, servers, and database connections.
      */
     const stop = async () => {
+        stopDeviceMqtt();
         await stopMqtt();
         dev2.jobs.stop();
+        weatherJob.stop();
         await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
         await database.end();
     };

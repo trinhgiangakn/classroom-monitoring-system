@@ -70,6 +70,24 @@ async function updateCommandTimeout(commandId) {
     return result.affectedRows > 0; // True if record was updated (i.e., was previously PENDING)
 }
 
+async function updateCommandResult(commandId, { status, executionTimeMs }) {
+    const sql = `
+        UPDATE device_commands
+        SET status = ?, execution_time_ms = ?, ack_received_at = CURRENT_TIMESTAMP
+        WHERE command_id = ? AND status = 'PENDING'
+    `;
+    const [result] = await db.query(sql, [status, executionTimeMs, commandId]);
+    return result.affectedRows > 0;
+}
+
+async function updateActualState(deviceId, actualState) {
+    const [result] = await db.query(
+        'UPDATE devices SET actual_state = ? WHERE device_id = ?',
+        [actualState, deviceId],
+    );
+    return result.affectedRows > 0;
+}
+
 /**
  * Fetch recent command execution logs joined with device information.
  * @param {number} [limit=20] - Maximum number of command logs to retrieve.
@@ -119,6 +137,8 @@ module.exports = {
     updateOperationMode,
     createCommand,
     updateCommandTimeout,
+    updateCommandResult,
+    updateActualState,
     getRecentCommands,
     getCommandById
 };

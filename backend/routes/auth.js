@@ -1,11 +1,30 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const db = require('../config/db');
 const crypto = require('crypto');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
 const router = express.Router();
+
+function getMailTransporter() {
+    const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
+
+    if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+        throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS.');
+    }
+
+    return nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: Number(SMTP_PORT),
+        secure: SMTP_SECURE === 'true',
+        auth: {
+            user: SMTP_USER,
+            pass: SMTP_PASS,
+        },
+    });
+}
 
 // Account creation API (used to test password hashing)
 router.post('/register', async (req, res) => {
@@ -165,7 +184,10 @@ router.post('/reset-password', async (req, res) => {
 
         // Validate the reset token and its expiry time
         const [users] = await db.query(
-            'SELECT * FROM users WHERE email = ? AND reset_token = ? AND reset_token_expiry > NOW()',
+            // `reset_token_expiry` is written by Node.js as a UTC time. Compare it
+            // with MySQL's UTC clock as well, so the result does not depend on the
+            // Windows/MySQL server time zone.
+            'SELECT * FROM users WHERE email = ? AND reset_token = ? AND reset_token_expiry > UTC_TIMESTAMP()',
             [email, token]
         );
 
@@ -221,7 +243,23 @@ router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (re
         const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(target_email)}`;
         
         console.log(`[ĐÃ DUYỆT] Link khôi phục của ${target_email} là:`);
-        console.log(resetLink);
+        try {
+            const transporter = getMailTransporter();
+            await transporter.sendMail({
+                from: process.env.MAIL_FROM || process.env.SMTP_USER,
+                to: target_email,
+                subject: 'Smart Classroom - Password reset request',
+                text: `Use this link to reset your password. It expires in 15 minutes: ${resetLink}`,
+                html: `<h2>Smart Classroom</h2><p>You requested a password reset.</p><p><a href="${resetLink}">Reset your password</a></p><p>This link expires in 15 minutes. If you did not make this request, ignore this email.</p>`,
+            });
+        } catch (mailError) {
+            await db.query(
+                'UPDATE users SET reset_token = NULL, reset_token_expiry = NULL, reset_requested = 1 WHERE email = ?',
+                [target_email]
+            );
+            console.error('Password reset email could not be sent:', mailError.message);
+            return res.status(502).json({ error: 'Could not send reset email. Check SMTP configuration.' });
+        }
 
         res.json({ message: `Đã duyệt thành công cho ${target_email}!` });
 

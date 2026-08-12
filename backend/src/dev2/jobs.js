@@ -13,12 +13,20 @@ function startOfDay(date) {
 }
 
 export class Dev2Jobs {
-  constructor({ repository, service, publish, logger = console, now = () => new Date() }) {
+  constructor({
+    repository,
+    service,
+    publish,
+    onNodeStatusesChanged = async () => {},
+    logger = console,
+    now = () => new Date(),
+  }) {
     if (!repository || !service) throw new TypeError('repository and service are required')
     if (typeof publish !== 'function') throw new TypeError('WebSocket publish adapter is required')
     this.repository = repository
     this.service = service
     this.publish = publish
+    this.onNodeStatusesChanged = onNodeStatusesChanged
     this.logger = logger
     this.now = now
     this.timers = []
@@ -29,6 +37,11 @@ export class Dev2Jobs {
     const events = await this.service.markOfflineNodes(cutoff)
     for (const event of events) {
       await this.publish(event.payload, { roomId: event.roomId, nodeId: event.nodeId })
+    }
+    for (const roomId of new Set(events.map((event) => event.roomId))) {
+      if (typeof this.service.nodeStatuses !== 'function') continue
+      const statuses = await this.service.nodeStatuses(roomId)
+      await this.onNodeStatusesChanged({ roomId, statuses })
     }
   }
 

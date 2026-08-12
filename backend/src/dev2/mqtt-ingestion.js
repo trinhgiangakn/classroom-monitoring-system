@@ -56,13 +56,22 @@ function unsubscribe(client, topic) {
 }
 
 export class MqttIngestion {
-  constructor({ client, service, publish, logger = console }) {
+  constructor({
+    client,
+    service,
+    publish,
+    onTelemetryPersisted = async () => {},
+    onNodeStatusesChanged = async () => {},
+    logger = console,
+  }) {
     if (!client?.on || !client?.subscribe) throw new TypeError('MQTT client is required')
     if (!service) throw new TypeError('service is required')
     if (typeof publish !== 'function') throw new TypeError('WebSocket publish adapter is required')
     this.client = client
     this.service = service
     this.publish = publish
+    this.onTelemetryPersisted = onTelemetryPersisted
+    this.onNodeStatusesChanged = onNodeStatusesChanged
     this.logger = logger
     this.started = false
     this.handleMessage = this.handleMessage.bind(this)
@@ -108,6 +117,22 @@ export class MqttIngestion {
           roomId: event.roomId,
           nodeId: event.nodeId ?? null,
         })
+      }
+
+      if (context.type === 'telemetry' && result.telemetry) {
+        await this.onTelemetryPersisted({
+          roomId: context.roomId,
+          nodeId: context.nodeId,
+          telemetry: result.telemetry,
+        })
+      }
+
+      if (
+        (context.type === 'telemetry' || context.type === 'node-status')
+        && result.events.some((event) => event.payload.event === 'node:status')
+      ) {
+        const statuses = await this.service.nodeStatuses(context.roomId)
+        await this.onNodeStatusesChanged({ roomId: context.roomId, statuses })
       }
     } catch (error) {
       this.logger.warn?.('Dev 2 rejected MQTT message', {
