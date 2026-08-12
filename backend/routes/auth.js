@@ -2,14 +2,20 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const dns = require('dns');
 const db = require('../config/db');
 const crypto = require('crypto');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
+// Force Node.js to use IPv4 first to avoid ENETUNREACH on cloud environments like Render
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+
 const router = express.Router();
 
 function getMailTransporter() {
-    const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_SERVICE } = process.env;
+    const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
 
     if (!SMTP_USER || !SMTP_PASS) {
         throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS.');
@@ -17,33 +23,24 @@ function getMailTransporter() {
 
     const cleanUser = (SMTP_USER || '').trim();
     const cleanPass = (SMTP_PASS || '').replace(/\s+/g, '');
-
-    const isGmail = (SMTP_HOST && SMTP_HOST.includes('gmail')) || cleanUser.endsWith('@gmail.com') || SMTP_SERVICE === 'gmail';
-
-    if (isGmail) {
-        return nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: cleanUser,
-                pass: cleanPass,
-            },
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 15000,
-        });
-    }
+    const port = Number(SMTP_PORT || 587);
+    const isExplicitSecure = SMTP_SECURE === 'true' || port === 465;
 
     return nodemailer.createTransport({
         host: SMTP_HOST || 'smtp.gmail.com',
-        port: Number(SMTP_PORT || 465),
-        secure: SMTP_SECURE === 'true' || Number(SMTP_PORT) === 465,
+        port: port,
+        secure: isExplicitSecure,
+        requireTLS: !isExplicitSecure,
         auth: {
             user: cleanUser,
             pass: cleanPass,
         },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
+        tls: {
+            rejectUnauthorized: false,
+        },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
     });
 }
 
