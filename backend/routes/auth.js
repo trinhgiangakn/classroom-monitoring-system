@@ -61,7 +61,11 @@ async function sendSystemEmail({ to, subject, html, text }) {
                 to: [{ email: recipient }],
                 subject: subject,
                 htmlContent: html,
-                textContent: text
+                textContent: text,
+                headers: {
+                    'X-Priority': '1 (Highest)',
+                    'Importance': 'High'
+                }
             })
         });
         const data = await response.json();
