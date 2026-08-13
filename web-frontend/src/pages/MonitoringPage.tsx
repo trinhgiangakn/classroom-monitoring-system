@@ -65,14 +65,14 @@ export function MonitoringPage() {
       if (isInitial) setLoading(true)
       Promise.all([
         getSensorHistory({ timeRange, nodeId, dataType }),
-        getRecentSensors({ timeRange, nodeId, limit: 50 }),
+        getRecentSensors({ timeRange, nodeId, limit: 10 }),
         getLatestSensors(),
         getNodes(),
       ]).then(([history, recentRows, latest, nodeRows]) => {
         if (!active) return
         const liveSeries = toHistoryPoints(history.series)
         setSeries(liveSeries.length ? liveSeries : [])
-        setRecent(toRecentTelemetry(recentRows))
+        setRecent(toRecentTelemetry(recentRows).slice(0, 10))
         setNodes(toSensorNodes(nodeRows, latest))
         setError(null)
       }).catch((reason: unknown) => {
@@ -219,8 +219,8 @@ export function MonitoringPage() {
         <div className="flex items-center gap-2">
           <RadioTower aria-hidden="true" className="size-4 text-cyan-300" />
           <div>
-            <h2 className="text-base font-bold text-slate-100">Bản ghi gần đây</h2>
-            <p className="mt-1 text-xs text-slate-500">Telemetry lấy trực tiếp từ `/api/sensors/recent`.</p>
+            <h2 className="text-base font-bold text-slate-100">10 bản ghi gần nhất</h2>
+            <p className="mt-1 text-xs text-slate-500">Telemetry thời gian thực lấy trực tiếp từ `/api/sensors/recent`.</p>
           </div>
         </div>
         <table className="mt-4 w-full min-w-[860px] text-left text-sm">
