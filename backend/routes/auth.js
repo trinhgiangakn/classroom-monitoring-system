@@ -382,15 +382,13 @@ router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (re
             });
             console.log(`[APPROVE-RESET] Gửi email thành công cho ${recipientEmail}:`, mailInfo.response);
         } catch (mailError) {
-            await db.query(
-                'UPDATE users SET reset_token = NULL, reset_token_expiry = NULL, reset_requested = 1 WHERE email = ?',
-                [recipientEmail]
-            );
-            console.error('Password reset email could not be sent:', mailError.message);
-            return res.status(502).json({ error: 'Could not send reset email. Check SMTP configuration: ' + mailError.message });
+            console.error('Password reset email error (link still generated):', mailError.message);
         }
 
-        res.json({ message: `Đã gửi email cấp lại mật khẩu thành công cho ${recipientEmail}!` });
+        res.json({
+            message: `Đã cấp link khôi phục mật khẩu thành công cho ${recipientEmail}!`,
+            resetLink: resetLink
+        });
     } catch (error) {
         res.status(500).json({ error: "Lỗi hệ thống: " + error.message });
     }

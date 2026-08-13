@@ -102,8 +102,13 @@ function UsersPanel({ isManager, onAction }: { isManager: boolean, onAction: (ms
       })
       const data = await res.json()
       if (res.ok) {
-        alert(data.message || `Đã gửi link khôi phục MK thành công cho ${email}`)
-        onAction(`Đã gửi link khôi phục MK cho ${email}`)
+        if (data.resetLink) {
+          try { navigator.clipboard?.writeText(data.resetLink) } catch {}
+          window.prompt(`Cấp mật khẩu thành công cho ${email}!\n\nLink đổi mật khẩu (đã sao chép vào bộ nhớ tạm):`, data.resetLink)
+        } else {
+          alert(data.message || `Đã gửi link khôi phục MK thành công cho ${email}`)
+        }
+        onAction(`Đã cấp link khôi phục MK cho ${email}`)
         fetchUsers()
       } else {
         alert(data.error || data.message || 'Lỗi gửi mail!')
