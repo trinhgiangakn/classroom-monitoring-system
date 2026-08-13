@@ -18,7 +18,7 @@ function getMailTransporter() {
     const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
 
     if (!SMTP_USER || !SMTP_PASS) {
-        throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS.');
+        throw new Error('SMTP is not configured. Set SMTP_USER and SMTP_PASS or RESEND_API_KEY.');
     }
 
     const cleanUser = (SMTP_USER || '').trim();
@@ -41,6 +41,70 @@ function getMailTransporter() {
         connectionTimeout: 15000,
         greetingTimeout: 15000,
         socketTimeout: 20000,
+    });
+}
+
+async function sendSystemEmail({ to, subject, html, text }) {
+    const recipient = Array.isArray(to) ? to[0] : to;
+
+    // 1. Resend HTTP REST API (port 443 HTTPS - 100% immune to Cloud SMTP port blocks)
+    if (process.env.RESEND_API_KEY) {
+        const fromAddr = process.env.MAIL_FROM ? process.env.MAIL_FROM.replace(/^"|"$/g, '') : 'Smart Classroom <onboarding@resend.dev>';
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from: fromAddr,
+                to: [recipient],
+                subject: subject,
+                html: html,
+                text: text
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`Resend API: ${data.message || JSON.stringify(data)}`);
+        }
+        return { response: 'Resend HTTP API OK', id: data.id };
+    }
+
+    // 2. Brevo HTTP REST API (port 443 HTTPS)
+    if (process.env.BREVO_API_KEY) {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'api-key': process.env.BREVO_API_KEY.trim(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: 'Smart Classroom', email: process.env.SMTP_USER || 'no-reply@smartclassroom.com' },
+                to: [{ email: recipient }],
+                subject: subject,
+                htmlContent: html,
+                textContent: text
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`Brevo API: ${data.message || JSON.stringify(data)}`);
+        }
+        return { response: 'Brevo HTTP API OK', messageId: data.messageId };
+    }
+
+    // 3. Fallback to standard SMTP
+    const transporter = getMailTransporter();
+    const senderUser = (process.env.SMTP_USER || '').trim();
+    const senderFrom = process.env.MAIL_FROM ? process.env.MAIL_FROM.replace(/^"|"$/g, '') : `Smart Classroom <${senderUser}>`;
+
+    return await transporter.sendMail({
+        from: senderFrom,
+        to: recipient,
+        subject: subject,
+        text: text,
+        html: html,
     });
 }
 
@@ -293,12 +357,7 @@ router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (re
         
         console.log(`[ĐÃ DUYỆT] Link khôi phục của ${recipientEmail} là: ${resetLink}`);
         try {
-            const transporter = getMailTransporter();
-            const senderUser = (process.env.SMTP_USER || '').trim();
-            const senderFrom = process.env.MAIL_FROM ? process.env.MAIL_FROM.replace(/^"|"$/g, '') : `Smart Classroom <${senderUser}>`;
-
-            const mailInfo = await transporter.sendMail({
-                from: senderFrom,
+            const mailInfo = await sendSystemEmail({
                 to: recipientEmail,
                 subject: 'Smart Classroom - Yêu cầu khôi phục mật khẩu',
                 text: `Sử dụng liên kết này để đặt lại mật khẩu cho tài khoản Smart Classroom của bạn: ${resetLink}`,
