@@ -47,7 +47,31 @@ function getMailTransporter() {
 async function sendSystemEmail({ to, subject, html, text }) {
     const recipient = Array.isArray(to) ? to[0] : to;
 
-    // 1. Resend HTTP REST API (port 443 HTTPS - 100% immune to Cloud SMTP port blocks)
+    // 1. Brevo HTTP REST API (port 443 HTTPS - sends to all Gmails without domain verification)
+    if (process.env.BREVO_API_KEY) {
+        const brevoSender = (process.env.BREVO_SENDER || process.env.SMTP_USER || 'baokhanhdtm@gmail.com').trim();
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'api-key': process.env.BREVO_API_KEY.trim(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: 'Smart Classroom', email: brevoSender },
+                to: [{ email: recipient }],
+                subject: subject,
+                htmlContent: html,
+                textContent: text
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`Brevo API: ${data.message || JSON.stringify(data)}`);
+        }
+        return { response: 'Brevo HTTP API OK', messageId: data.messageId };
+    }
+
+    // 2. Resend HTTP REST API (port 443 HTTPS)
     if (process.env.RESEND_API_KEY) {
         const fromAddr = (process.env.RESEND_FROM && !process.env.RESEND_FROM.includes('gmail.com'))
             ? process.env.RESEND_FROM.replace(/^"|"$/g, '')
@@ -72,29 +96,6 @@ async function sendSystemEmail({ to, subject, html, text }) {
             throw new Error(`Resend API: ${data.message || JSON.stringify(data)}`);
         }
         return { response: 'Resend HTTP API OK', id: data.id };
-    }
-
-    // 2. Brevo HTTP REST API (port 443 HTTPS)
-    if (process.env.BREVO_API_KEY) {
-        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: {
-                'api-key': process.env.BREVO_API_KEY.trim(),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                sender: { name: 'Smart Classroom', email: process.env.SMTP_USER || 'no-reply@smartclassroom.com' },
-                to: [{ email: recipient }],
-                subject: subject,
-                htmlContent: html,
-                textContent: text
-            })
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(`Brevo API: ${data.message || JSON.stringify(data)}`);
-        }
-        return { response: 'Brevo HTTP API OK', messageId: data.messageId };
     }
 
     // 3. Fallback to standard SMTP
