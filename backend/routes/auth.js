@@ -49,7 +49,7 @@ async function sendSystemEmail({ to, subject, html, text }) {
 
     // 1. Brevo HTTP REST API (port 443 HTTPS - sends to all Gmails without domain verification)
     if (process.env.BREVO_API_KEY) {
-        const brevoSender = (process.env.BREVO_SENDER || process.env.SMTP_USER || 'baokhanhdtm@gmail.com').trim();
+        const brevoSender = (process.env.BREVO_SENDER || 'baokhanhdtm@gmail.com').trim();
         const response = await fetch('https://api.brevo.com/v3/smtp/email', {
             method: 'POST',
             headers: {
