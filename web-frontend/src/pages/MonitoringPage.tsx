@@ -56,33 +56,52 @@ export function MonitoringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    Promise.all([
-      getSensorHistory({ timeRange, nodeId, dataType }),
-      getRecentSensors({ timeRange, nodeId, limit: 50 }),
-      getLatestSensors(),
-      getNodes(),
-    ]).then(([history, recentRows, latest, nodeRows]) => {
-      if (!active) return
-      const liveSeries = toHistoryPoints(history.series)
-      setSeries(liveSeries.length ? liveSeries : [])
-      setRecent(toRecentTelemetry(recentRows))
-      setNodes(toSensorNodes(nodeRows, latest))
-      setError(null)
-    }).catch((reason: unknown) => {
-      if (!active) return
-      setError(reason instanceof Error ? reason.message : 'Không thể tải dữ liệu Dev2')
-      setSeries(fallbackSeries)
-      setRecent(fallbackRecent)
-      setNodes(fallbackNodes)
-    }).finally(() => {
-      if (active) setLoading(false)
-    })
-    return () => { active = false }
-  }, [dataType, nodeId, timeRange])
+
+    const loadData = (isInitial = false) => {
+      if (isInitial) setLoading(true)
+      Promise.all([
+        getSensorHistory({ timeRange, nodeId, dataType }),
+        getRecentSensors({ timeRange, nodeId, limit: 50 }),
+        getLatestSensors(),
+        getNodes(),
+      ]).then(([history, recentRows, latest, nodeRows]) => {
+        if (!active) return
+        const liveSeries = toHistoryPoints(history.series)
+        setSeries(liveSeries.length ? liveSeries : [])
+        setRecent(toRecentTelemetry(recentRows))
+        setNodes(toSensorNodes(nodeRows, latest))
+        setError(null)
+      }).catch((reason: unknown) => {
+        if (!active) return
+        if (isInitial) {
+          setError(reason instanceof Error ? reason.message : 'Không thể tải dữ liệu Dev2')
+          setSeries(fallbackSeries)
+          setRecent(fallbackRecent)
+          setNodes(fallbackNodes)
+        }
+      }).finally(() => {
+        if (active && isInitial) setLoading(false)
+      })
+    }
+
+    loadData(true)
+
+    // Auto-polling every 3 seconds
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && autoRefresh) {
+        loadData(false)
+      }
+    }, 3000)
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [autoRefresh, dataType, nodeId, timeRange])
 
   const selectedLines = dataType === 'all'
     ? [lineDefinitions.temperature, lineDefinitions.humidity]
@@ -102,19 +121,43 @@ export function MonitoringPage() {
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-            {loading ? 'Đang tải API' : error ? 'Dữ liệu dự phòng' : `Live API · ${recent.length} bản ghi`}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+              {loading ? 'Đang tải API' : error ? 'Dữ liệu dự phòng' : `Live API · ${recent.length} bản ghi`}
+            </p>
+            {autoRefresh && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+                </span>
+                Live 3s
+              </span>
+            )}
+          </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">Giám sát dữ liệu môi trường</h1>
           <p className="mt-2 text-sm text-slate-400">Theo dõi AHT20, BMP280, BH1750 và MQ135 trong phòng P.101.</p>
         </div>
-        <button
-          className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-400/20"
-          onClick={exportCsv}
-          type="button"
-        >
-          <Download aria-hidden="true" className="size-4" /> Xuất CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+              autoRefresh 
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20' 
+                : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+            type="button"
+          >
+            {autoRefresh ? '🟢 Đang bật Live' : '⚪ Tạm dừng Live'}
+          </button>
+          <button
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-400/20"
+            onClick={exportCsv}
+            type="button"
+          >
+            <Download aria-hidden="true" className="size-4" /> Xuất CSV
+          </button>
+        </div>
       </div>
 
       {error ? <Notice tone="warning">Không tải được API Dev2: {error}. Đang hiển thị dữ liệu dự phòng.</Notice> : null}
