@@ -49,7 +49,10 @@ async function sendSystemEmail({ to, subject, html, text }) {
 
     // 1. Resend HTTP REST API (port 443 HTTPS - 100% immune to Cloud SMTP port blocks)
     if (process.env.RESEND_API_KEY) {
-        const fromAddr = process.env.MAIL_FROM ? process.env.MAIL_FROM.replace(/^"|"$/g, '') : 'Smart Classroom <onboarding@resend.dev>';
+        const fromAddr = (process.env.RESEND_FROM && !process.env.RESEND_FROM.includes('gmail.com'))
+            ? process.env.RESEND_FROM.replace(/^"|"$/g, '')
+            : 'Smart Classroom <onboarding@resend.dev>';
+
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
