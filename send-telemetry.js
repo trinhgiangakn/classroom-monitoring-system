@@ -12,7 +12,16 @@
  *      node send-telemetry.js --loop
  */
 
-const mqtt = require('./backend/node_modules/mqtt');
+let mqtt;
+try {
+  mqtt = require('./backend/node_modules/mqtt');
+} catch {
+  try {
+    mqtt = require('d:/Projects/classroom-monitoring-system/backend/node_modules/mqtt');
+  } catch {
+    mqtt = require('mqtt');
+  }
+}
 
 const BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://broker.emqx.io:1883';
 const ROOM_ID = 'P.101';
