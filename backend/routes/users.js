@@ -26,6 +26,11 @@ router.put('/:id', async (req, res) => {
             return res.status(400).json({ error: 'Invalid role.' });
         }
 
+        const [targetUser] = await db.query('SELECT username FROM users WHERE id = ?', [userId]);
+        if (targetUser[0]?.username === 'baokhanhdtm' && role !== 'admin') {
+            return res.status(400).json({ error: 'Không thể hạ quyền tài khoản Quản trị viên gốc (baokhanhdtm)!' });
+        }
+
         const [result] = await db.query(
             'UPDATE users SET role = ? WHERE id = ?',
             [role, userId]
@@ -45,6 +50,11 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const userId = req.params.id;
+
+        const [targetUser] = await db.query('SELECT username FROM users WHERE id = ?', [userId]);
+        if (targetUser[0]?.username === 'baokhanhdtm') {
+            return res.status(400).json({ error: 'Không thể xóa tài khoản Quản trị viên gốc (baokhanhdtm)!' });
+        }
 
         const [result] = await db.query('DELETE FROM users WHERE id = ?', [userId]);
 

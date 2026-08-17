@@ -3,13 +3,18 @@ const { DeviceCommandError } = require('../services/deviceCommandService');
 
 /**
  * GET /api/devices
- * Retrieve the list of all registered devices.
+ * Retrieve the list of all registered devices along with room mode and lock state.
  */
 async function getDevices(req, res) {
     try {
         const devices = await deviceService.getAllDevices();
+        const operationMode = devices[0]?.operation_mode || 'MANUAL';
         return res.status(200).json({
             success: true,
+            room_id: 'P.101',
+            operation_mode: operationMode,
+            manual_control_locked: operationMode === 'AUTO',
+            devices: devices,
             data: devices
         });
     } catch (error) {
@@ -41,19 +46,31 @@ async function getDeviceById(req, res) {
 /**
  * PUT /api/devices/mode
  * Update the operation mode (AUTO/MANUAL) for room devices.
- * Body payload: { "mode": "MANUAL" } or { "mode": "AUTO" }
+ * Body payload: { "mode": "MANUAL", "room_id": "P.101" } or { "mode": "AUTO" }
  */
 async function setOperationMode(req, res) {
     try {
-        const { mode } = req.body;
+        const { mode, room_id = 'P.101' } = req.body;
         if (!['AUTO', 'MANUAL'].includes(mode)) {
             return res.status(400).json({ success: false, message: 'Invalid operation mode (Allowed: AUTO or MANUAL)' });
         }
 
         await deviceService.updateOperationMode(mode);
+
+        // Notify realtime room subscribers if WebSocket is initialized
+        const realtime = req.app.get('realtime');
+        realtime?.publishToRoom(room_id, {
+            event: 'mode:update',
+            data: { room_id, current_mode: mode }
+        });
+
         return res.status(200).json({
             success: true,
-            message: `Room operation mode updated to ${mode}`
+            room_id,
+            current_mode: mode,
+            message: mode === 'MANUAL'
+                ? 'Đã chuyển sang chế độ MANUAL. Nút bấm điều khiển tay đã được mở khóa.'
+                : 'Đã chuyển sang chế độ AUTO. Các điều khiển thủ công đã bị khóa.'
         });
     } catch (error) {
         console.error('Error in setOperationMode:', error);
@@ -70,31 +87,43 @@ async function controlDevice(req, res) {
     try {
         const deviceId = req.params.id;
         const { action } = req.body;
+
+        if (!action) {
+            return res.status(400).json({ success: false, message: 'Thiếu tham số action (TURN_ON, TURN_OFF, OPEN, CLOSE, STOP)' });
+        }
+
         const commandService = req.app.get('deviceCommandService');
         if (!commandService) {
             throw new DeviceCommandError('Device command service is unavailable', 503);
         }
+
         const command = await commandService.dispatch({
             deviceId,
             action,
             source: 'MANUAL',
-            requestedBy: req.user?.username,
+            requestedBy: req.user?.username || 'admin',
         });
 
         return res.status(202).json({
             success: true,
-            message: 'Control command accepted, waiting for ESP32 ACK response',
-            data: {
-                command_id: command.commandId,
-                device_id: command.deviceId,
-                action: command.action,
-                status: command.status,
-            }
+            command_id: command.commandId,
+            device_id: command.deviceId,
+            device_name: command.deviceName ?? deviceId,
+            action: command.action,
+            status: 'PENDING_ACK',
+            message: `Đã gửi lệnh ${action === 'TURN_ON' ? 'BẬT' : action === 'TURN_OFF' ? 'TẮT' : action} ${command.deviceName ?? deviceId}. Lệnh đã được chuyển tới ESP32 Gateway và đang chờ phản hồi ACK`,
+            hint: 'Đảm bảo ack-simulator.js đang chạy và kết nối cùng MQTT Broker với Backend để nhận ACK'
         });
 
     } catch (error) {
         if (error instanceof DeviceCommandError) {
-            return res.status(error.statusCode).json({ success: false, message: error.message });
+            const statusCode = error.statusCode || 400;
+            const hint = statusCode === 503
+                ? 'MQTT Broker chưa kết nối. Khởi động Mosquitto và chạy lại backend.'
+                : statusCode === 403
+                ? 'Phòng đang ở chế độ AUTO — chuyển về MANUAL trước khi điều khiển thủ công.'
+                : undefined;
+            return res.status(statusCode).json({ success: false, message: error.message, hint });
         }
         console.error('Error in controlDevice:', error);
         return res.status(500).json({ success: false, message: 'Internal server error' });

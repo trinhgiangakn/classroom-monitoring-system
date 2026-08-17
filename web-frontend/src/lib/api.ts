@@ -1,6 +1,7 @@
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 
-export const API_BASE_URL = configuredBaseUrl || 'https://classroom-monitoring-system-btga.onrender.com/api'
+export const API_BASE_URL = configuredBaseUrl || (isLocalhost ? 'http://localhost:3000/api' : 'https://classroom-monitoring-system-btga.onrender.com/api')
 
 export function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('accessToken')

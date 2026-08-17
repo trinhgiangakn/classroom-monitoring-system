@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { useState } from 'react'
+import { clearSession, hasValidSession } from './lib/api'
+import { heartbeatApi, logoutApi } from './services/adminApi'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { AdminPage } from './pages/AdminPage'
 import { AlertsPage } from './pages/AlertsPage'
@@ -11,12 +13,26 @@ import { RegistrationPage } from './pages/RegistrationPage'
 import { SystemStatusPage } from './pages/SystemStatusPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
-import { clearSession, hasValidSession } from './lib/api'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(hasValidSession)
 
-  const logout = () => {
+  // Send activity heartbeat ping every 45s while user is logged in
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    // Immediate ping on mount
+    void heartbeatApi()
+
+    const interval = setInterval(() => {
+      void heartbeatApi()
+    }, 45_000)
+
+    return () => clearInterval(interval)
+  }, [isAuthenticated])
+
+  const logout = async () => {
+    await logoutApi()
     clearSession()
     setIsAuthenticated(false)
   }

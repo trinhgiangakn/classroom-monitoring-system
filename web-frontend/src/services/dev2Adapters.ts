@@ -29,7 +29,7 @@ export function toMetrics(latest: LatestSensorDto[]): EnvironmentMetric[] {
   const light = average(latest.map(row => row.light_lux))
   const airQualityPpm = average(latest.map(row => row.air_quality_ppm))
   const airQuality = latest.find(row => row.air_quality_status)?.air_quality_status || 'Chưa có dữ liệu'
-  const liveTrend = 'Dữ liệu trực tiếp từ Backend Dev2'
+  const liveTrend = 'Thời gian thực'
 
   return [
     { id: 'temperature', label: 'Nhiệt độ', value: display(temperature, '°C'), source: 'AHT20 · trung bình các node', trend: liveTrend, tone: 'cyan' },

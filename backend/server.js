@@ -22,6 +22,8 @@ const database = require('./config/db');
 const authRoutes = require('./routes/auth');
 const auditRoutes = require('./routes/audit');
 const userRoutes = require('./routes/users');
+const automationRoutes = require('./routes/automation');
+const alertRoutes = require('./routes/alerts');
 const deviceRoutes = require('./src/routes/deviceRoutes');
 
 // Middleware & Service Modules
@@ -94,6 +96,8 @@ async function createApp({
     app.use('/api/auth', authRoutes);
     app.use('/api/audit-logs', auditRoutes);
     app.use('/api/users', userRoutes);
+    app.use('/api/automation', automationRoutes);
+    app.use('/api/alerts', alertRoutes);
 
     // Register Dev 3 device control API routes
     app.use('/api', deviceRoutes);

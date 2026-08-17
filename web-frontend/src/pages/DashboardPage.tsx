@@ -5,10 +5,11 @@ import { EnvironmentChart } from '../components/dashboard/EnvironmentChart'
 import { MetricCard } from '../components/dashboard/MetricCard'
 import { NodeCard } from '../components/dashboard/NodeCard'
 import { QuickControls } from '../components/dashboard/QuickControls'
-import { alerts, environmentSeries as fallbackSeries, metrics as fallbackMetrics, sensorNodes as fallbackNodes } from '../data/mockDashboard'
+import { alerts as fallbackAlerts, environmentSeries as fallbackSeries, metrics as fallbackMetrics, sensorNodes as fallbackNodes } from '../data/mockDashboard'
 import { getLatestSensors, getNodes, getSensorHistory } from '../services/dev2Api'
+import { getAlerts, type ApiAlertItem } from '../services/adminApi'
 import { toHistoryPoints, toMetrics, toSensorNodes } from '../services/dev2Adapters'
-import type { EnvironmentMetric, EnvironmentPoint, SensorNode } from '../types/dashboard'
+import type { EnvironmentMetric, EnvironmentPoint, SensorNode, AlertItem } from '../types/dashboard'
 
 const metricIcons = {
   temperature: Thermometer,
@@ -22,6 +23,7 @@ export function DashboardPage() {
   const [metrics, setMetrics] = useState<EnvironmentMetric[]>(fallbackMetrics)
   const [series, setSeries] = useState<EnvironmentPoint[]>(fallbackSeries)
   const [nodes, setNodes] = useState<SensorNode[]>(fallbackNodes)
+  const [alerts, setAlerts] = useState<AlertItem[]>(fallbackAlerts)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,17 +36,27 @@ export function DashboardPage() {
         getLatestSensors(),
         getSensorHistory({ timeRange: '6h' }),
         getNodes(),
-      ]).then(([latest, history, nodeRows]) => {
+        getAlerts(3).catch(() => [] as ApiAlertItem[]),
+      ]).then(([latest, history, nodeRows, alertRows]) => {
         if (!active) return
         const liveSeries = toHistoryPoints(history.series)
         setMetrics(toMetrics(latest))
         setSeries(liveSeries.length ? liveSeries : fallbackSeries)
         setNodes(toSensorNodes(nodeRows, latest))
+        if (alertRows && alertRows.length > 0) {
+          setAlerts(alertRows.map(a => ({
+            id: a.id,
+            title: a.title,
+            message: a.message,
+            severity: a.severity,
+            time: a.time,
+          })))
+        }
         setError(null)
       }).catch((reason: unknown) => {
         if (!active) return
         if (isInitial) {
-          setError(reason instanceof Error ? reason.message : 'Không thể tải dữ liệu Dev2')
+          setError(reason instanceof Error ? reason.message : 'Không thể tải dữ liệu cảm biến')
         }
       }).finally(() => {
         if (active && isInitial) setLoading(false)
@@ -74,7 +86,7 @@ export function DashboardPage() {
         <div>
           <div className="flex items-center gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-              Web Dashboard · {loading ? 'Đang tải API' : error ? 'Dữ liệu dự phòng' : 'Live API Dev2'}
+              Web Dashboard · {loading ? 'Đang tải dữ liệu' : 'Giám sát trực tiếp'}
             </p>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
               <span className="relative flex size-2">
@@ -94,7 +106,7 @@ export function DashboardPage() {
 
       {error ? (
         <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">
-          Không tải được API Dev2: {error}. Dashboard đang dùng dữ liệu dự phòng.
+          Không kết nối được máy chủ: {error}.
         </p>
       ) : null}
 
@@ -125,7 +137,7 @@ export function DashboardPage() {
       </section>
 
       <p className="mt-6 text-xs text-slate-600">
-        Phòng P.101 · Cảm biến, node và biểu đồ lấy từ REST API Dev2; điều khiển nhanh và cảnh báo vẫn thuộc module khác.
+        Phòng P.101 · Dữ liệu cảm biến 4 góc phòng và điều khiển thiết bị thông minh.
       </p>
     </>
   )

@@ -271,9 +271,9 @@ export const SQL = Object.freeze({
   gatewayStatus: `
     SELECT
       g.gateway_code AS gateway_id,
-      g.gateway_status AS status,
-      g.wifi_connected,
-      g.mqtt_connected,
+      IF(g.gateway_status = 'ONLINE' AND g.last_seen_at >= UTC_TIMESTAMP(3) - INTERVAL 60 SECOND, 'ONLINE', 'OFFLINE') AS status,
+      IF(g.last_seen_at >= UTC_TIMESTAMP(3) - INTERVAL 60 SECOND, g.wifi_connected, 0) AS wifi_connected,
+      IF(g.last_seen_at >= UTC_TIMESTAMP(3) - INTERVAL 60 SECOND, g.mqtt_connected, 0) AS mqtt_connected,
       g.wifi_rssi AS wifi_signal_dbm,
       g.ip_address,
       g.firmware_version,

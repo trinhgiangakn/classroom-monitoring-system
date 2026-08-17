@@ -13,7 +13,8 @@ const pool = mysql.createPool({
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'classroom_monitoring',
     ssl: sslOption,
-    timezone: 'Z',
+    charset: 'utf8mb4',
+    timezone: process.env.DB_TIMEZONE || '+07:00',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0

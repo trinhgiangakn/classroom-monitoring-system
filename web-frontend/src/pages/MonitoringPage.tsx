@@ -78,7 +78,7 @@ export function MonitoringPage() {
       }).catch((reason: unknown) => {
         if (!active) return
         if (isInitial) {
-          setError(reason instanceof Error ? reason.message : 'Không thể tải dữ liệu Dev2')
+          setError(reason instanceof Error ? reason.message : 'Không thể tải dữ liệu cảm biến')
           setSeries(fallbackSeries)
           setRecent(fallbackRecent)
           setNodes(fallbackNodes)
@@ -111,7 +111,7 @@ export function MonitoringPage() {
     try {
       setExportMessage('Đang tạo tệp CSV...')
       await downloadSensorCsv({ timeRange, nodeId })
-      setExportMessage('Đã tải tệp CSV từ Backend Dev2.')
+      setExportMessage('Đã tải tệp CSV thành công.')
     } catch (reason) {
       setExportMessage(reason instanceof Error ? reason.message : 'Không thể xuất CSV')
     }
@@ -123,7 +123,7 @@ export function MonitoringPage() {
         <div>
           <div className="flex items-center gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-              {loading ? 'Đang tải API' : error ? 'Dữ liệu dự phòng' : `Live API · ${recent.length} bản ghi`}
+              {loading ? 'Đang tải dữ liệu' : error ? 'Dữ liệu tạm thời' : `Trực tiếp · ${recent.length} bản ghi gần nhất`}
             </p>
             {autoRefresh && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
@@ -160,7 +160,7 @@ export function MonitoringPage() {
         </div>
       </div>
 
-      {error ? <Notice tone="warning">Không tải được API Dev2: {error}. Đang hiển thị dữ liệu dự phòng.</Notice> : null}
+      {error ? <Notice tone="warning">Không thể kết nối máy chủ: {error}. Đang hiển thị dữ liệu tạm thời.</Notice> : null}
       {exportMessage ? <Notice tone="success">{exportMessage}</Notice> : null}
 
       <section aria-label="Bộ lọc dữ liệu" className="mt-5 grid gap-3 rounded-xl border border-slate-800 bg-slate-950/25 p-3 md:grid-cols-4">

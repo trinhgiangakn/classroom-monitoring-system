@@ -13,26 +13,32 @@ export function SystemStatusPage() {
 
   useEffect(() => {
     let active = true
-    Promise.all([getNodes(), getLatestSensors(), getGatewayStatus()])
-      .then(([nodeRows, latest, gatewayRow]) => {
-        if (!active) return
-        setNodes(toSensorNodes(nodeRows, latest))
-        setGateway(toGatewayRuntime(gatewayRow))
-        setError(null)
-      })
-      .catch((reason: unknown) => {
-        if (!active) return
-        setError(reason instanceof Error ? reason.message : 'Không thể tải trạng thái hệ thống')
-      })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+
+    const fetchStatus = () => {
+      Promise.all([getNodes(), getLatestSensors(), getGatewayStatus()])
+        .then(([nodeRows, latest, gatewayRow]) => {
+          if (!active) return
+          setNodes(toSensorNodes(nodeRows, latest))
+          setGateway(toGatewayRuntime(gatewayRow))
+          setError(null)
+        })
+        .catch((reason: unknown) => {
+          if (!active) return
+          setError(reason instanceof Error ? reason.message : 'Không thể tải trạng thái hệ thống')
+        })
+        .finally(() => { if (active) setLoading(false) })
+    }
+
+    fetchStatus()
+    const timer = setInterval(fetchStatus, 5000)
+    return () => { active = false; clearInterval(timer) }
   }, [])
 
   const apiOnline = !loading && !error
   const services = [
     { label: 'MQTT Broker', detail: 'Trạng thái do ESP32 Gateway báo cáo', icon: Radio, online: gateway?.mqttConnected ?? false },
     { label: 'ESP32 Gateway', detail: gateway ? `${gateway.gatewayId} · RSSI ${gateway.wifiSignalDbm ?? '—'} dBm` : 'Chưa nhận trạng thái', icon: Router, online: gateway?.status === 'Online' },
-    { label: 'Node.js Backend', detail: 'REST API Dev1 + Dev2', icon: Server, online: apiOnline },
+    { label: 'Node.js Backend', detail: 'REST API & WebSocket Engine', icon: Server, online: apiOnline },
     { label: 'MySQL Database', detail: 'Telemetry · Users · Logs', icon: Database, online: apiOnline },
   ]
 
@@ -40,7 +46,7 @@ export function SystemStatusPage() {
     <section>
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-          Theo dõi kỹ thuật · {loading ? 'Đang tải API' : error ? 'Dữ liệu dự phòng' : 'Live API Dev2'}
+          Hạ tầng & Kết nối · Hệ thống giám sát P.101
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">Trạng thái hệ thống</h1>
         <p className="mt-2 text-sm text-slate-400">Kết nối node, gateway và dịch vụ máy chủ của phòng P.101.</p>
@@ -48,7 +54,7 @@ export function SystemStatusPage() {
 
       {error ? (
         <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">
-          Không tải được trạng thái thật: {error}. Node đang hiển thị dữ liệu dự phòng; dịch vụ được đánh dấu Offline.
+          Không tải được trạng thái: {error}.
         </p>
       ) : null}
 
@@ -104,7 +110,7 @@ export function SystemStatusPage() {
         <div className="mt-4 space-y-2 font-mono text-xs">
           <p className={gateway?.mqttConnected ? 'text-emerald-300' : 'text-rose-300'}>MQTT {gateway?.mqttConnected ? 'connected' : 'disconnected'}</p>
           <p className={gateway?.wifiConnected ? 'text-cyan-200' : 'text-rose-300'}>Gateway Wi-Fi {gateway?.wifiConnected ? 'connected' : 'disconnected'}</p>
-          <p className="text-slate-400">{nodes.length} sensor node được Backend Dev2 trả về</p>
+          <p className="text-slate-400">{nodes.length} node cảm biến đang hoạt động</p>
         </div>
       </section>
     </section>

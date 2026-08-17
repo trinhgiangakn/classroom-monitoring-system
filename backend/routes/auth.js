@@ -197,6 +197,10 @@ router.post('/login', async (req, res) => {
         );
 
         await db.query(
+            'UPDATE users SET is_online = 1, last_login = CURRENT_TIMESTAMP, last_active_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [user.id]
+        );
+        await db.query(
             'INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)',
             [user.id, 'LOGIN', 'Đăng nhập thành công vào hệ thống']
         );
@@ -398,11 +402,51 @@ router.post('/admin/approve-reset', verifyToken, requireRole('admin'), async (re
     }
 });
 
+// User Logout API
+router.post('/logout', verifyToken, async (req, res) => {
+    try {
+        if (req.user && req.user.id) {
+            await db.query('UPDATE users SET is_online = 0 WHERE id = ?', [req.user.id]);
+            await db.query(
+                'INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)',
+                [req.user.id, 'LOGOUT', 'Đăng xuất khỏi hệ thống']
+            );
+        }
+        res.json({ success: true, message: 'Đăng xuất thành công!' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// User Heartbeat / Activity Ping API (called by web client every 30-60s)
+router.post('/heartbeat', verifyToken, async (req, res) => {
+    try {
+        if (req.user && req.user.id) {
+            await db.query('UPDATE users SET is_online = 1, last_active_at = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id]);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get the full list of users for the Admin page
 router.get('/admin/users', verifyToken, requireRole('admin'), async (req, res) => {
     try {
         const [users] = await db.query(
-            'SELECT id, full_name, username, email, role, status, reset_requested FROM users'
+            `SELECT 
+                id, 
+                full_name, 
+                username, 
+                email, 
+                role, 
+                status, 
+                reset_requested, 
+                last_login,
+                last_active_at,
+                IF(is_online = 1 AND (last_active_at >= NOW() - INTERVAL 3 MINUTE OR last_login >= NOW() - INTERVAL 3 MINUTE), 1, 0) AS is_online
+            FROM users 
+            ORDER BY id ASC`
         );
         res.json(users);
     } catch (error) {

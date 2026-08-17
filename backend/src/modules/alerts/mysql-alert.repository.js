@@ -2,6 +2,18 @@ const { ALERT_STATUS } = require('./alert.constants');
 
 function mapAlert(row) {
   if (!row) return null;
+
+  // mysql2 automatically parses JSON columns into objects.
+  // Guard against legacy string rows or unexpected types just in case.
+  let metadata = null;
+  if (row.metadata !== null && row.metadata !== undefined) {
+    if (typeof row.metadata === 'string') {
+      try { metadata = JSON.parse(row.metadata); } catch { metadata = null; }
+    } else {
+      metadata = row.metadata; // already an Object — do NOT call JSON.parse again
+    }
+  }
+
   return {
     id: String(row.alert_id),
     roomId: row.room_code,
@@ -9,7 +21,7 @@ function mapAlert(row) {
     source: row.source,
     message: row.message,
     status: row.status,
-    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    metadata,
     createdAt: row.created_at,
     acknowledgedBy: row.acknowledged_by,
     acknowledgedAt: row.acknowledged_at,

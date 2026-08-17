@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getLatestSensors } from './dev2Api'
+import { API_BASE_URL } from '../lib/api'
 
 afterEach(() => {
   localStorage.clear()
@@ -18,7 +19,7 @@ describe('Dev2 API client', () => {
     await getLatestSensors()
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3000/api/sensors/latest?room_id=P.101',
+      `${API_BASE_URL}/sensors/latest?room_id=P.101`,
       expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } }),
     )
   })
