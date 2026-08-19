@@ -196,7 +196,18 @@ async function getCommandById(commandId) {
         const [rows] = await db.query(sql, [commandId]);
         return rows[0] || null;
     } catch (err) {
-        console.warn('getCommandById DB query failed:', err.message);
+async function getLatestPendingCommandForDevice(deviceId) {
+    try {
+        const sql = `
+            SELECT * FROM device_commands
+            WHERE device_id = ? AND status = 'PENDING'
+            ORDER BY requested_at DESC
+            LIMIT 1
+        `;
+        const [rows] = await db.query(sql, [deviceId]);
+        return rows[0] || null;
+    } catch (err) {
+        console.warn('getLatestPendingCommandForDevice failed:', err.message);
         return null;
     }
 }
@@ -210,5 +221,6 @@ module.exports = {
     updateCommandResult,
     updateActualState,
     getRecentCommands,
-    getCommandById
+    getCommandById,
+    getLatestPendingCommandForDevice
 };

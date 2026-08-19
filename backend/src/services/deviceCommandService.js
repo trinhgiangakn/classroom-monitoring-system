@@ -100,40 +100,107 @@ class DeviceCommandService {
     };
   }
 
-  async handleAck({ command_id: commandId, device_id: deviceId, status, execution_time_ms: executionTimeMs, actual_state: actualState }) {
-    if (!commandId || !deviceId || !status) {
-      throw new DeviceCommandError('ACK must contain command_id, device_id, and status');
+  async handleAck(ackData, topicDeviceId = null) {
+    let deviceId = ackData.device_id || topicDeviceId;
+    if (deviceId) {
+      const aliasMap = {
+        LIGHT: 'LIGHT_01',
+        FAN: 'FAN_01',
+        HUMIDIFIER: 'HUMIDIFIER_01',
+        CURTAIN: 'CURTAIN_01',
+        RELAY_1: 'LIGHT_01',
+        RELAY_2: 'FAN_01',
+        RELAY_3: 'HUMIDIFIER_01',
+        CURTAIN_MOTOR: 'CURTAIN_01',
+      };
+      deviceId = aliasMap[deviceId.toUpperCase()] || deviceId;
+    }
+
+    let commandId = ackData.command_id;
+    let command = null;
+
+    if (commandId) {
+      command = await this.devices.getCommandById(commandId);
+    } else if (deviceId && typeof this.devices.getLatestPendingCommandForDevice === 'function') {
+      command = await this.devices.getLatestPendingCommandForDevice(deviceId);
+      if (command) {
+        commandId = command.command_id;
+      }
+    }
+
+    if (!commandId || !command) {
+      if (deviceId && ackData.actual_state) {
+        await this.devices.updateActualState(deviceId, ackData.actual_state);
+        const realtime = this.app.get('realtime');
+        realtime?.publishToRoom(this.roomId, {
+          event: 'device:status',
+          data: { device_id: deviceId, actual_state: ackData.actual_state },
+        });
+      }
+      return undefined;
     }
 
     const timer = this.pendingTimers.get(commandId);
     if (timer) this.clearTimer(timer);
     this.pendingTimers.delete(commandId);
 
-    const command = await this.devices.getCommandById(commandId);
-    if (!command || command.status !== 'PENDING') return undefined;
+    const rawStatus = String(ackData.status || 'SUCCESS').toUpperCase();
+    const normalizedStatus = rawStatus === 'SUCCESS' || rawStatus === 'OK' ? 'SUCCESS' : 'FAILED';
+    const executionTimeMs = ackData.execution_time_ms ?? 50;
 
-    const normalizedStatus = status === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
-    const updated = await this.devices.updateCommandResult(commandId, {
+    let actualState = ackData.actual_state;
+    if (!actualState && normalizedStatus === 'SUCCESS') {
+      const actionStateMap = {
+        TURN_ON: 'ON',
+        TURN_OFF: 'OFF',
+        OPEN: 'OPENING',
+        CLOSE: 'CLOSING',
+        STOP: 'STOPPED',
+      };
+      actualState = actionStateMap[command.action] ?? 'ON';
+    }
+
+    await this.devices.updateCommandResult(commandId, {
       status: normalizedStatus,
-      executionTimeMs: executionTimeMs ?? null,
+      executionTimeMs,
     });
-    if (!updated) return undefined;
 
-    if (normalizedStatus === 'SUCCESS' && actualState) {
+    if (normalizedStatus === 'SUCCESS' && actualState && deviceId) {
       await this.devices.updateActualState(deviceId, actualState);
     }
 
     await this.#publishCommandUpdate({
       roomId: this.roomId,
       commandId,
-      deviceId,
+      deviceId: deviceId || command.device_id,
       action: command.action,
       source: command.source,
       status: normalizedStatus,
-      executionTimeMs: executionTimeMs ?? null,
+      executionTimeMs,
       actualState: normalizedStatus === 'SUCCESS' ? actualState : null,
     });
     return { commandId, status: normalizedStatus };
+  }
+
+  async handleDeviceStatus({ actual_state: actualState }, topicDeviceId = null) {
+    if (!actualState || !topicDeviceId) return;
+    const aliasMap = {
+      LIGHT: 'LIGHT_01',
+      FAN: 'FAN_01',
+      HUMIDIFIER: 'HUMIDIFIER_01',
+      CURTAIN: 'CURTAIN_01',
+      RELAY_1: 'LIGHT_01',
+      RELAY_2: 'FAN_01',
+      RELAY_3: 'HUMIDIFIER_01',
+      CURTAIN_MOTOR: 'CURTAIN_01',
+    };
+    const targetDeviceId = aliasMap[topicDeviceId.toUpperCase()] || topicDeviceId;
+    await this.devices.updateActualState(targetDeviceId, actualState);
+    const realtime = this.app.get('realtime');
+    realtime?.publishToRoom(this.roomId, {
+      event: 'device:status',
+      data: { device_id: targetDeviceId, actual_state: actualState },
+    });
   }
 
   async #handleTimeout({ commandId, roomId, deviceId, action, source }) {

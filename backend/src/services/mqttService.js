@@ -14,6 +14,15 @@ function isDeviceAckTopic(topic) {
     return new RegExp(`^${ROOM_TOPIC_PREFIX.replace('.', '\\.')}/[^/]+/ack$`).test(topic);
 }
 
+function isDeviceStatusTopic(topic) {
+    return new RegExp(`^${ROOM_TOPIC_PREFIX.replace('.', '\\.')}/[^/]+/status$`).test(topic);
+}
+
+function extractDeviceIdFromTopic(topic) {
+    const match = topic.match(new RegExp(`^${ROOM_TOPIC_PREFIX.replace('.', '\\.')}/([^/]+)/(?:ack|status)$`));
+    return match ? match[1] : null;
+}
+
 /**
  * Register DEV 3 ACK handling on the MQTT client shared with DEV 2.
  * @returns {() => void} cleanup function used during graceful shutdown.
@@ -29,32 +38,39 @@ function initMQTT({ app, mqttClient, logger = console }) {
     expressApp = app;
     activeLogger = logger;
     const ackTopic = `${ROOM_TOPIC_PREFIX}/+/ack`;
+    const statusTopic = `${ROOM_TOPIC_PREFIX}/+/status`;
 
-    const subscribeToAcks = () => {
-        client.subscribe(ackTopic, { qos: 1 }, (error) => {
+    const subscribeToTopics = () => {
+        client.subscribe([ackTopic, statusTopic], { qos: 1 }, (error) => {
             if (error) {
-                activeLogger.error?.('Device ACK subscription failed', { message: error.message, ackTopic });
+                activeLogger.error?.('Device MQTT subscriptions failed', { message: error.message });
                 return;
             }
-            activeLogger.info?.(`DEV 3 subscribed to ${ackTopic}`);
+            activeLogger.info?.(`DEV 3 subscribed to ${ackTopic} and ${statusTopic}`);
         });
     };
 
     const handleMessage = async (topic, message) => {
-        if (!isDeviceAckTopic(topic)) return;
+        const topicDeviceId = extractDeviceIdFromTopic(topic);
+        if (!topicDeviceId) return;
         try {
-            await handleDeviceAck(JSON.parse(message.toString()));
+            const payload = JSON.parse(message.toString());
+            if (isDeviceStatusTopic(topic)) {
+                await handleDeviceStatus(payload, topicDeviceId);
+            } else if (isDeviceAckTopic(topic)) {
+                await handleDeviceAck(payload, topicDeviceId);
+            }
         } catch (error) {
-            activeLogger.error?.('Invalid device ACK message', { topic, message: error.message });
+            activeLogger.error?.('Invalid device ACK/status message', { topic, message: error.message });
         }
     };
 
-    client.on('connect', subscribeToAcks);
+    client.on('connect', subscribeToTopics);
     client.on('message', handleMessage);
-    if (client.connected) queueMicrotask(subscribeToAcks);
+    if (client.connected) queueMicrotask(subscribeToTopics);
 
     return () => {
-        client.off?.('connect', subscribeToAcks);
+        client.off?.('connect', subscribeToTopics);
         client.off?.('message', handleMessage);
         client = null;
         expressApp = null;
@@ -76,12 +92,21 @@ function publishCommand(deviceId, commandPayload) {
 }
 
 /** Process an ESP32 ACK and notify WebSocket clients plus DEV 4 alert logic. */
-async function handleDeviceAck(ackData) {
+async function handleDeviceAck(ackData, topicDeviceId = null) {
     const commandService = expressApp?.get('deviceCommandService');
     if (!commandService) {
         throw new Error('Device command service is unavailable');
     }
-    return commandService.handleAck(ackData);
+    return commandService.handleAck(ackData, topicDeviceId);
 }
 
-module.exports = { initMQTT, publishCommand, handleDeviceAck, isDeviceAckTopic };
+/** Process an ESP32 device status update. */
+async function handleDeviceStatus(statusData, topicDeviceId = null) {
+    const commandService = expressApp?.get('deviceCommandService');
+    if (!commandService) {
+        throw new Error('Device command service is unavailable');
+    }
+    return commandService.handleDeviceStatus(statusData, topicDeviceId);
+}
+
+module.exports = { initMQTT, publishCommand, handleDeviceAck, handleDeviceStatus, isDeviceAckTopic };
