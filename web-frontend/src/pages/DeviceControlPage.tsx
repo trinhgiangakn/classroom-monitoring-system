@@ -449,6 +449,7 @@ export function DeviceControlPage() {
                             second: '2-digit',
                             day: '2-digit',
                             month: '2-digit',
+                            timeZone: 'Asia/Ho_Chi_Minh',
                           }).format(new Date(cmd.requested_at))
                         : '—'}
                     </td>

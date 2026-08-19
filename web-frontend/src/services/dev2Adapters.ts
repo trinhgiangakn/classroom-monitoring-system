@@ -54,7 +54,7 @@ export function toHistoryPoints(series: HistorySeriesDto): EnvironmentPoint[] {
     for (const item of series[seriesKey] ?? []) {
       if (!item.timestamp) continue
       const current = points.get(item.timestamp) ?? {
-        time: new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(item.timestamp)),
+        time: new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(item.timestamp)),
         temperature: null,
         humidity: null,
       }

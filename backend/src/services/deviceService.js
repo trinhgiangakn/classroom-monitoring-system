@@ -196,6 +196,11 @@ async function getCommandById(commandId) {
         const [rows] = await db.query(sql, [commandId]);
         return rows[0] || null;
     } catch (err) {
+        console.warn('getCommandById DB query failed:', err.message);
+        return null;
+    }
+}
+
 async function getLatestPendingCommandForDevice(deviceId) {
     try {
         const sql = `

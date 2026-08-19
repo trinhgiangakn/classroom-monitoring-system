@@ -14,7 +14,7 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME || 'classroom_monitoring',
     ssl: sslOption,
     charset: 'utf8mb4',
-    timezone: process.env.DB_TIMEZONE || '+07:00',
+    timezone: process.env.DB_TIMEZONE || '+00:00', // UTC: ensures accurate UTC-to-local timezone conversion
     waitForConnections: true,
     connectionLimit: 5,        // Aiven free tier: giới hạn số kết nối đồng thời
     queueLimit: 0,
