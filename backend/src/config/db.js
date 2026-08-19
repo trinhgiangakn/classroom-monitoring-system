@@ -1,13 +1,6 @@
-const mysql = require('mysql2/promise');
-
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'giang181101',
-    database: process.env.DB_NAME || 'smartclass_db',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
-
-module.exports = pool;
+/**
+ * Re-export the canonical database pool from backend/config/db.js.
+ * This ensures all modules (dev2, services, controllers) share the same
+ * properly-configured pool: correct port, SSL for Aiven, and keepAlive.
+ */
+module.exports = require('../../config/db');
