@@ -16,8 +16,11 @@ const pool = mysql.createPool({
     charset: 'utf8mb4',
     timezone: process.env.DB_TIMEZONE || '+07:00',
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    connectionLimit: 5,        // Aiven free tier: giới hạn số kết nối đồng thời
+    queueLimit: 0,
+    connectTimeout: 15000,     // 15s timeout khi tạo kết nối mới
+    enableKeepAlive: true,     // Gửi keepalive packet để Aiven không đóng idle connection
+    keepAliveInitialDelay: 30000, // Gửi keepalive sau 30s idle
 });
 
 async function testConnection() {
