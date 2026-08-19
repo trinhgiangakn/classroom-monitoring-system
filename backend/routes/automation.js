@@ -112,7 +112,7 @@ router.put('/rules/:id/toggle', verifyToken, requireRole('admin', 'manager'), as
  */
 router.get('/thresholds', verifyToken, async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT device_id, conditions FROM automation_rules WHERE room_code = "P.101"');
+        const [rows] = await db.query('SELECT device_id, conditions FROM automation_rules WHERE room_code = ?', ['P.101']);
 
         const thresholds = {
             tempOn: 30.0,
@@ -160,7 +160,7 @@ router.put('/thresholds', verifyToken, requireRole('admin', 'manager'), async (r
             lightLampOn,
         } = req.body;
 
-        const [rows] = await db.query('SELECT rule_id, device_id, conditions FROM automation_rules WHERE room_code = "P.101"');
+        const [rows] = await db.query('SELECT rule_id, device_id, conditions FROM automation_rules WHERE room_code = ?', ['P.101']);
 
         for (const row of rows) {
             const conditions = typeof row.conditions === 'string' ? JSON.parse(row.conditions) : (row.conditions || {});

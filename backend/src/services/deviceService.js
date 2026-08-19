@@ -14,7 +14,7 @@ const DEFAULT_DEVICES = [
  */
 async function getAllDevices() {
     try {
-        const [rows] = await db.query('SELECT * FROM devices ORDER BY FIELD(device_id, "LIGHT_01", "FAN_01", "HUMIDIFIER_01", "CURTAIN_01")');
+        const [rows] = await db.query("SELECT * FROM devices ORDER BY FIELD(device_id, 'LIGHT_01', 'FAN_01', 'HUMIDIFIER_01', 'CURTAIN_01')");
         if (rows && rows.length >= 4) {
             return rows;
         }
@@ -28,7 +28,7 @@ async function getAllDevices() {
                 [dev.device_id, dev.name, dev.type, dev.actual_state, dev.desired_state, dev.operation_mode, dev.limit_open_status, dev.limit_close_status, dev.timeout_seconds]
             );
         }
-        const [seededRows] = await db.query('SELECT * FROM devices ORDER BY FIELD(device_id, "LIGHT_01", "FAN_01", "HUMIDIFIER_01", "CURTAIN_01")');
+        const [seededRows] = await db.query("SELECT * FROM devices ORDER BY FIELD(device_id, 'LIGHT_01', 'FAN_01', 'HUMIDIFIER_01', 'CURTAIN_01')");
         return seededRows && seededRows.length > 0 ? seededRows : DEFAULT_DEVICES;
     } catch (error) {
         console.warn('Database devices query fallback to memory defaults:', error.message);
