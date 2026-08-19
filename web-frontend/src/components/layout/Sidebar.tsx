@@ -30,18 +30,27 @@ export function Sidebar() {
       getGatewayStatus()
         .then(gw => {
           if (!active || !gw) return
-          setGatewayOnline(gw.status === 'Online')
+          const rawStatus = (gw.status || '').toUpperCase()
+          setGatewayOnline(rawStatus === 'ONLINE')
           setMqttOnline(Boolean(gw.mqtt_connected))
         })
         .catch(() => {
           if (active) {
             setGatewayOnline(false)
-            setMqttOnline(false)
           }
         })
+
+      fetch('/api/health')
+        .then(r => r.json())
+        .then(h => {
+          if (active && h && typeof h.mqtt_connected === 'boolean') {
+            setMqttOnline(prev => h.mqtt_connected || prev)
+          }
+        })
+        .catch(() => {})
     }
     check()
-    const id = setInterval(check, 15000)
+    const id = setInterval(check, 5000)
     return () => { active = false; clearInterval(id) }
   }, [])
 

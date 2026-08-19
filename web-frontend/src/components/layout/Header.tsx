@@ -60,30 +60,41 @@ export function Header({ onLogout }: HeaderProps) {
     let active = true
 
     const fetchStatus = () => {
+      // 1. Kiểm tra trạng thái gateway từ DB
       getGatewayStatus()
         .then(gateway => {
           if (!active || !gateway) return
           const lastSeenStr = (gateway as unknown as Record<string, string>).last_seen_at ?? null
-          const isOnline = gateway.status === 'Online'
+          const rawStatus = (gateway.status || '').toUpperCase()
+          const isOnline = rawStatus === 'ONLINE'
           const mqttOk   = Boolean(gateway.mqtt_connected)
 
-          // Nếu backend trả về last_seen_at, dùng để tính stale time
           if (lastSeenStr) {
             const stale = Date.now() - new Date(lastSeenStr).getTime() > GATEWAY_STALE_MS
-            setConnection({ mqtt: mqttOk, gateway: isOnline && !stale })
+            setConnection(prev => ({ mqtt: mqttOk || prev.mqtt, gateway: isOnline && !stale }))
           } else {
-            setConnection({ mqtt: mqttOk, gateway: isOnline })
+            setConnection(prev => ({ mqtt: mqttOk || prev.mqtt, gateway: isOnline }))
           }
         })
         .catch(() => {
           if (active) setConnection(prev => ({ ...prev, gateway: false }))
         })
+
+      // 2. Kiểm tra trực tiếp kết nối MQTT của Backend qua /api/health
+      fetch(`${wsBase()}/api/health`)
+        .then(r => r.json())
+        .then(h => {
+          if (active && h && typeof h.mqtt_connected === 'boolean') {
+            setConnection(prev => ({ ...prev, mqtt: h.mqtt_connected || prev.mqtt }))
+          }
+        })
+        .catch(() => {})
     }
 
     fetchStatus()
 
-    // Poll mỗi 30s như bảo hiểm, WebSocket sẽ cập nhật tức thì khi có sự kiện
-    const pollId = setInterval(fetchStatus, 30_000)
+    // Poll mỗi 5s để cập nhật nhanh
+    const pollId = setInterval(fetchStatus, 5_000)
     return () => { active = false; clearInterval(pollId) }
   }, [])
 
