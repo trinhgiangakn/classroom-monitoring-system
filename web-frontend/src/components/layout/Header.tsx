@@ -113,24 +113,17 @@ export function Header({ onLogout }: HeaderProps) {
 
     // Backend phát event này khi ESP32 publish lên MQTT topic gateway/status
     socket.on('gateway:status', (data: { status?: string; mqtt_connected?: boolean; last_seen_at?: string }) => {
-      const isOnline = data?.status === 'Online'
+      const rawStatus = (data?.status || '').toUpperCase()
+      const isOnline = rawStatus === 'ONLINE'
       const mqttOk   = Boolean(data?.mqtt_connected)
 
       if (data?.last_seen_at) {
         const stale = Date.now() - new Date(data.last_seen_at).getTime() > GATEWAY_STALE_MS
-        setConnection({ mqtt: mqttOk, gateway: isOnline && !stale })
+        setConnection(prev => ({ mqtt: mqttOk || prev.mqtt, gateway: isOnline && !stale }))
       } else {
-        setConnection(prev => ({ mqtt: mqttOk ?? prev.mqtt, gateway: isOnline }))
+        setConnection(prev => ({ mqtt: mqttOk || prev.mqtt, gateway: isOnline }))
       }
     })
-
-    // Cập nhật MQTT khi broker reconnect/disconnect
-    socket.on('connect', () =>
-      setConnection(prev => ({ ...prev, mqtt: true }))
-    )
-    socket.on('disconnect', () =>
-      setConnection(prev => ({ ...prev, mqtt: false }))
-    )
 
     return () => { socket.disconnect() }
   }, [])

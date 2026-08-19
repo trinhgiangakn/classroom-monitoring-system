@@ -6,8 +6,10 @@ function positiveNumber(value, fallback) {
 }
 
 function buildMqttOptions(env = process.env) {
+    const randomSuffix = Math.random().toString(16).substring(2, 8);
+    const baseId = env.MQTT_CLIENT_ID || 'classroom-backend';
     const options = {
-        clientId: env.MQTT_CLIENT_ID || `classroom-backend-${process.pid}`,
+        clientId: `${baseId}-${randomSuffix}`,
         clean: true,
         connectTimeout: positiveNumber(env.MQTT_CONNECT_TIMEOUT_MS, 10_000),
         reconnectPeriod: positiveNumber(env.MQTT_RECONNECT_PERIOD_MS, 2_000),
