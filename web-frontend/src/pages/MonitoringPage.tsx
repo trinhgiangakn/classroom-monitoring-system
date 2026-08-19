@@ -24,7 +24,11 @@ import {
 import { toHistoryPoints, toRecentTelemetry, toSensorNodes } from '../services/dev2Adapters'
 import type { EnvironmentPoint, RecentTelemetry, SensorNode } from '../types/dashboard'
 
+import { io } from 'socket.io-client'
+import { API_BASE_URL } from '../lib/api'
+
 const cardClass = 'rounded-2xl border border-slate-800 bg-[#0c1d37] p-4 sm:p-5'
+const wsBase = () => API_BASE_URL.replace(/\/api$/, '')
 
 const fallbackRecent: RecentTelemetry[] = fallbackNodes.map(node => ({
   timestamp: null,
@@ -71,8 +75,9 @@ export function MonitoringPage() {
       ]).then(([history, recentRows, latest, nodeRows]) => {
         if (!active) return
         const liveSeries = toHistoryPoints(history.series)
-        setSeries(liveSeries.length ? liveSeries : [])
-        setRecent(toRecentTelemetry(recentRows).slice(0, 10))
+        setSeries(liveSeries.length ? liveSeries : fallbackSeries)
+        const recentTelemetryRows = toRecentTelemetry(recentRows)
+        setRecent(recentTelemetryRows.length ? recentTelemetryRows.slice(0, 10) : fallbackRecent)
         setNodes(toSensorNodes(nodeRows, latest))
         setError(null)
       }).catch((reason: unknown) => {
@@ -97,9 +102,56 @@ export function MonitoringPage() {
       }
     }, 3000)
 
+    // WebSocket real-time sensor updates
+    const socket = io(wsBase(), {
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+      reconnectionDelay: 3000,
+    })
+
+    socket.on('connect', () => {
+      socket.emit('join-room', 'P.101')
+    })
+
+    socket.on('sensor:update', (data: {
+      time: string
+      node_id: string
+      temperature: number | null
+      humidity: number | null
+      light_lux: number | null
+      air_quality: string
+      status: string
+    }) => {
+      if (!active || !data) return
+      setRecent(prev => [
+        {
+          timestamp: new Date().toISOString(),
+          nodeId: data.node_id,
+          temperature: data.temperature,
+          humidity: data.humidity,
+          pressure: 1013.25,
+          light: data.light_lux,
+          airQualityPpm: null,
+          airQualityStatus: data.air_quality,
+          status: data.status,
+        },
+        ...prev.slice(0, 9),
+      ])
+
+      setNodes(prev => prev.map(n => n.id === data.node_id ? {
+        ...n,
+        temperature: data.temperature ?? n.temperature,
+        humidity: data.humidity ?? n.humidity,
+        light: data.light_lux ?? n.light,
+        airQuality: data.air_quality || n.airQuality,
+        status: 'Online',
+      } : n))
+    })
+
     return () => {
       active = false
       clearInterval(interval)
+      socket.disconnect()
     }
   }, [autoRefresh, dataType, nodeId, timeRange])
 
