@@ -204,6 +204,7 @@ export class IotService {
     const status = parseGatewayStatusPayload(value, context)
     const result = await this.repository.updateGatewayStatus(status)
     return {
+      gateway: status,
       events: result.changed
         ? [{
             roomId: status.roomId,
@@ -217,6 +218,11 @@ export class IotService {
     const metrics = parseGatewayMetricsPayload(value, context)
     const result = await this.repository.insertGatewayMetrics(metrics)
     return {
+      gateway: {
+        ...metrics,
+        status: metrics.wifiConnected && metrics.mqttConnected ? 'ONLINE' : 'DEGRADED',
+        wifiRssi: metrics.wifiSignalDbm,
+      },
       events: result.inserted
         ? [{
             roomId: metrics.roomId,
@@ -235,6 +241,23 @@ export class IotService {
     }))
   }
 
+  async markOfflineGateways(cutoff) {
+    const gateways = await this.repository.markStaleGatewaysOffline(cutoff)
+    return gateways.map((gateway) => ({
+      roomId: gateway.room_id,
+      gateway: {
+        roomId: gateway.room_id,
+        gatewayId: gateway.gateway_id,
+        status: 'OFFLINE',
+        wifiConnected: false,
+        mqttConnected: false,
+        wifiRssi: gateway.wifi_signal_dbm,
+        lastSeenAt: gateway.last_seen_at,
+      },
+      payload: buildGatewayStatusEvent(gateway, this.now()),
+    }))
+  }
+
   /**
    * Internal integration projection for DEV 4 Safe Mode.  This intentionally
    * returns raw status codes instead of UI-formatted Vietnamese labels.
@@ -245,6 +268,10 @@ export class IotService {
       roomId,
       nodeId: row.node_id,
       status: row.node_status ?? row.status,
+      sensorHealth: row.sensor_health,
+      rssi: row.signal_rssi ?? row.rssi ?? null,
+      packetSuccessRate: row.packet_success_rate === null ? null : Number(row.packet_success_rate),
+      batteryPercent: row.battery_percent === null ? null : Number(row.battery_percent),
     }))
   }
 }

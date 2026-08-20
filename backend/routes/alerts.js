@@ -39,8 +39,8 @@ router.get('/', verifyToken, async (req, res) => {
             CRITICAL: 'warning',
             HIGH: 'warning',
             WARNING: 'warning',
-            MEDIUM: 'info',
-            INFO: 'info',
+            MEDIUM: 'warning',
+            INFO: 'warning',
             RESOLVED: 'success',
         };
 

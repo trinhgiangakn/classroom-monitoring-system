@@ -132,7 +132,7 @@ export const alerts: AlertItem[] = [
     title: 'Chế độ vận hành',
     message: 'Hệ thống đang ở chế độ MANUAL.',
     time: '15 phút trước',
-    severity: 'info',
+    severity: 'warning',
   },
   {
     id: 'gateway',

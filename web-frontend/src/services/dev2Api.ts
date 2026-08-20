@@ -62,6 +62,17 @@ export interface GatewayDto {
   }
 }
 
+export interface SystemHealthDto {
+  success: true
+  service: string
+  mqtt_connected: boolean
+  services?: {
+    backend?: { connected: boolean }
+    database?: { connected: boolean }
+    mqtt?: { connected: boolean }
+  }
+}
+
 interface SuccessData<T> {
   success: true
   data: T
@@ -69,6 +80,7 @@ interface SuccessData<T> {
 
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    cache: 'no-store',
     ...init,
     headers: { ...authHeaders(), ...init?.headers },
   })
@@ -143,6 +155,10 @@ export async function getGatewayStatus(roomId = DEFAULT_ROOM_ID) {
     `/gateway/status?${queryString({ room_id: roomId })}`,
   )
   return Array.isArray(result.data) ? result.data[0] : result.data
+}
+
+export function getSystemHealth() {
+  return apiRequest<SystemHealthDto>('/health')
 }
 
 export async function downloadSensorCsv({

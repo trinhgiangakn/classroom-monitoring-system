@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { toHistoryPoints, toMetrics, toSensorNodes } from './dev2Adapters'
+import { toDashboardAlert, toHistoryPoints, toMetrics, toSensorNodes } from './dev2Adapters'
+import type { AlertDto } from './alertApi'
 import type { LatestSensorDto, NodeDto } from './dev2Api'
 
 const latest: LatestSensorDto[] = [{
@@ -25,6 +26,32 @@ const nodes: NodeDto[] = [{
 }]
 
 describe('Dev2 frontend adapters', () => {
+  it('normalizes workflow alerts for the dashboard alert list', () => {
+    const alert: AlertDto = {
+      id: '173',
+      room_id: 'P.101',
+      type: 'GATEWAY_OFFLINE',
+      severity: 'CRITICAL',
+      source: 'GW-P101-01',
+      condition_key: 'gateway:GW-P101-01:connectivity',
+      message: 'Gateway đã mất kết nối.',
+      status: 'NEW',
+      metadata: null,
+      created_at: '2026-08-17T10:46:36.000Z',
+      acknowledged_by: null,
+      acknowledged_at: null,
+      resolved_by: null,
+      resolved_at: null,
+    }
+
+    expect(toDashboardAlert(alert)).toMatchObject({
+      id: '173',
+      title: 'Cảnh báo GW-P101-01',
+      severity: 'warning',
+      message: 'Gateway đã mất kết nối.',
+    })
+  })
+
   it('turns latest telemetry into dashboard metrics', () => {
     const metrics = toMetrics(latest)
     expect(metrics.find(metric => metric.id === 'temperature')?.value).toBe('28.2 °C')

@@ -32,7 +32,10 @@ export function formatTime(value, timeZone = DEFAULT_TIME_ZONE) {
 export function formatRelativeSeconds(value, now = new Date()) {
   if (!value) return 'Chưa nhận dữ liệu'
   const date = value instanceof Date ? value : new Date(value)
-  const seconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000))
+  if (Number.isNaN(date.getTime())) return 'Thời gian không hợp lệ'
+  const differenceSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+  if (differenceSeconds < -60) return 'Thời gian không hợp lệ'
+  const seconds = Math.max(0, differenceSeconds)
   if (seconds < 60) return `${seconds} giây`
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes} phút`

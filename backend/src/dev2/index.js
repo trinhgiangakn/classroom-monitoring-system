@@ -14,6 +14,7 @@ export function createDev2Module({
   publishWebSocket,
   onTelemetryPersisted,
   onNodeStatusesChanged,
+  onGatewayStatusChanged,
   logger = console,
   now,
   timeZone,
@@ -32,6 +33,7 @@ export function createDev2Module({
     service,
     publish: publishWebSocket,
     onNodeStatusesChanged,
+    onGatewayStatusChanged,
     logger,
     now,
   })
@@ -42,6 +44,7 @@ export function createDev2Module({
         publish: publishWebSocket,
         onTelemetryPersisted,
         onNodeStatusesChanged,
+        onGatewayStatusChanged,
         logger,
       })
     : null

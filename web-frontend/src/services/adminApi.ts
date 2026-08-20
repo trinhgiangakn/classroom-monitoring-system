@@ -291,7 +291,7 @@ export interface ApiAlertItem {
   id: string
   title: string
   message: string
-  severity: 'warning' | 'info' | 'success'
+  severity: 'warning' | 'success'
   rawSeverity: string
   source: string
   time: string

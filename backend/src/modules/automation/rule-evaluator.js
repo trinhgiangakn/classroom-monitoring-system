@@ -50,7 +50,7 @@ function evaluateWeatherAdvisory(rule, weather) {
   return {
     matches: matches(value, advisory.comparison, Number(advisory.threshold)),
     value,
-    severity: advisory.severity ?? 'INFO',
+    severity: advisory.severity ?? 'WARNING',
     message: advisory.message ?? `Weather advisory for ${advisory.field}`,
   };
 }

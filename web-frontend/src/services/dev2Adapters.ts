@@ -1,10 +1,12 @@
 import type {
+  AlertItem,
   EnvironmentMetric,
   EnvironmentPoint,
   GatewayRuntime,
   RecentTelemetry,
   SensorNode,
 } from '../types/dashboard'
+import type { AlertDto } from './alertApi'
 import type {
   GatewayDto,
   HistorySeriesDto,
@@ -20,6 +22,29 @@ function average(values: Array<number | null | undefined>) {
 
 function display(value: number | null, unit: string, digits = 1) {
   return value === null ? '—' : `${value.toFixed(digits)} ${unit}`
+}
+
+export function toDashboardAlert(alert: AlertDto): AlertItem {
+  const createdAt = new Date(alert.created_at)
+  const time = Number.isNaN(createdAt.getTime())
+    ? alert.created_at
+    : new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(createdAt)
+
+  return {
+    id: alert.id,
+    title: alert.source ? `Cảnh báo ${alert.source}` : alert.type || 'Cảnh báo hệ thống',
+    message: alert.message,
+    time,
+    severity: alert.status === 'RESOLVED'
+      ? 'success'
+      : 'warning',
+  }
 }
 
 export function toMetrics(latest: LatestSensorDto[]): EnvironmentMetric[] {

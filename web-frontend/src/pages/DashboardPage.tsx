@@ -7,8 +7,8 @@ import { NodeCard } from '../components/dashboard/NodeCard'
 import { QuickControls } from '../components/dashboard/QuickControls'
 import { alerts as fallbackAlerts, environmentSeries as fallbackSeries, metrics as fallbackMetrics, sensorNodes as fallbackNodes } from '../data/mockDashboard'
 import { getLatestSensors, getNodes, getSensorHistory } from '../services/dev2Api'
-import { getAlerts, type ApiAlertItem } from '../services/adminApi'
-import { toHistoryPoints, toMetrics, toSensorNodes } from '../services/dev2Adapters'
+import { getAlerts, type AlertDto } from '../services/alertApi'
+import { toDashboardAlert, toHistoryPoints, toMetrics, toSensorNodes } from '../services/dev2Adapters'
 import type { EnvironmentMetric, EnvironmentPoint, SensorNode, AlertItem } from '../types/dashboard'
 
 const metricIcons = {
@@ -36,7 +36,7 @@ export function DashboardPage() {
         getLatestSensors(),
         getSensorHistory({ timeRange: '6h' }),
         getNodes(),
-        getAlerts(3).catch(() => [] as ApiAlertItem[]),
+        getAlerts({ limit: 3 }).catch(() => [] as AlertDto[]),
       ]).then(([latest, history, nodeRows, alertRows]) => {
         if (!active) return
         const liveSeries = toHistoryPoints(history.series)
@@ -44,13 +44,7 @@ export function DashboardPage() {
         setSeries(liveSeries.length ? liveSeries : fallbackSeries)
         setNodes(toSensorNodes(nodeRows, latest))
         if (alertRows && alertRows.length > 0) {
-          setAlerts(alertRows.map(a => ({
-            id: a.id,
-            title: a.title,
-            message: a.message,
-            severity: a.severity,
-            time: a.time,
-          })))
+          setAlerts(alertRows.map(toDashboardAlert))
         }
         setError(null)
       }).catch((reason: unknown) => {

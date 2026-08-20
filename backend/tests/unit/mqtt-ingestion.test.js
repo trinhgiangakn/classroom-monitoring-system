@@ -105,3 +105,44 @@ test('forwards only newly persisted telemetry to the automation integration hook
     telemetry: { roomId: 'P.101', nodeId: 'NODE-NW', temperature: 31 },
   }])
 })
+
+test('forwards gateway status and metrics to the monitoring alert hook', async () => {
+  const client = new FakeMqttClient()
+  const gatewayInputs = []
+  const service = {
+    ingestGatewayStatus: async () => ({
+      events: [],
+      gateway: { status: 'DEGRADED', wifiConnected: false, mqttConnected: true },
+    }),
+    ingestGatewayMetrics: async () => ({
+      events: [],
+      gateway: { status: 'ONLINE', cpuPercent: 88, wifiConnected: true, mqttConnected: true },
+    }),
+  }
+  const ingestion = new MqttIngestion({
+    client,
+    service,
+    publish: async () => {},
+    onGatewayStatusChanged: async (input) => gatewayInputs.push(input),
+  })
+
+  await ingestion.handleMessage(
+    'classroom/P.101/gateway/status',
+    Buffer.from('{"status":"DEGRADED"}'),
+  )
+  await ingestion.handleMessage(
+    'classroom/P.101/gateway/metrics',
+    Buffer.from('{"cpu_percent":88}'),
+  )
+
+  assert.deepEqual(gatewayInputs, [
+    {
+      roomId: 'P.101',
+      gateway: { status: 'DEGRADED', wifiConnected: false, mqttConnected: true },
+    },
+    {
+      roomId: 'P.101',
+      gateway: { status: 'ONLINE', cpuPercent: 88, wifiConnected: true, mqttConnected: true },
+    },
+  ])
+})

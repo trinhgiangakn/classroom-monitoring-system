@@ -60,7 +60,7 @@ export interface AlertItem {
   title: string
   message: string
   time: string
-  severity: 'warning' | 'info' | 'success'
+  severity: 'warning' | 'success'
 }
 
 export type DeviceId = 'light' | 'fan' | 'humidifier' | 'curtain'

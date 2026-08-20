@@ -1,6 +1,7 @@
 export const DEFAULT_ROOM_ID = 'P.101'
 export const DEFAULT_TIME_ZONE = 'Asia/Bangkok'
 export const NODE_OFFLINE_AFTER_SECONDS = 15
+export const GATEWAY_OFFLINE_AFTER_SECONDS = 30
 export const RAW_RETENTION_DAYS = 90
 
 export const MQTT_TOPICS = Object.freeze([

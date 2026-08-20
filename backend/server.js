@@ -23,11 +23,11 @@ const authRoutes = require('./routes/auth');
 const auditRoutes = require('./routes/audit');
 const userRoutes = require('./routes/users');
 const automationRoutes = require('./routes/automation');
-const alertRoutes = require('./routes/alerts');
 const deviceRoutes = require('./src/routes/deviceRoutes');
+const { createAlertRouter } = require('./src/routes/alertRoutes');
 
 // Middleware & Service Modules
-const { verifyToken } = require('./middleware/authMiddleware');
+const { verifyToken, requireRole } = require('./middleware/authMiddleware');
 const { auditLogger } = require('./middleware/auditMiddleware');
 const { attachMqttIngestion, createMqttClient } = require('./config/mqtt');
 const mqttService = require('./src/services/mqttService');
@@ -36,6 +36,7 @@ const deviceService = require('./src/services/deviceService');
 const { DeviceCommandService } = require('./src/services/deviceCommandService');
 const { AlertService } = require('./src/modules/alerts/alert.service');
 const { MySqlAlertRepository } = require('./src/modules/alerts/mysql-alert.repository');
+const { MonitoringAlertService } = require('./src/modules/alerts/monitoring-alert.service');
 const { AutomationService } = require('./src/modules/automation/automation.service');
 const { AutomationRuntime } = require('./src/modules/automation/automation-runtime');
 const { MySqlAutomationRepository } = require('./src/modules/automation/mysql-automation.repository');
@@ -45,6 +46,48 @@ const { MySqlWeatherRepository } = require('./src/modules/weather/mysql-weather.
 const { WeatherContextService } = require('./src/modules/weather/weather-context.service');
 const { WeatherSyncJob } = require('./src/modules/weather/weather-sync.job');
 const { REALTIME_EVENT } = require('./src/modules/realtime/realtime.events');
+
+async function checkDatabaseHealth(timeoutMs = 750) {
+    let timeout;
+    try {
+        await Promise.race([
+            database.query('SELECT 1 AS healthy'),
+            new Promise((resolve, reject) => {
+                timeout = setTimeout(() => reject(new Error('Database health check timed out')), timeoutMs);
+            }),
+        ]);
+        return true;
+    } catch {
+        return false;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+function createPublishWebSocket(getRealtime) {
+    if (typeof getRealtime !== 'function') {
+        throw new TypeError('Realtime getter is required');
+    }
+
+    return async (eventOrEnvelope, context = {}) => {
+        const publisher = getRealtime();
+        if (!publisher) return undefined;
+
+        const isEnvelope = eventOrEnvelope && typeof eventOrEnvelope === 'object';
+        const event = isEnvelope ? eventOrEnvelope.event : eventOrEnvelope;
+        const data = isEnvelope ? eventOrEnvelope.data : context;
+        if (typeof event !== 'string' || !event) {
+            throw new TypeError('Realtime event name must be a non-empty string');
+        }
+
+        const roomId = context.room_id
+            || context.roomId
+            || data?.room_id
+            || data?.roomId
+            || 'P.101';
+        return publisher.publishToRoom(roomId, { event, data });
+    };
+}
 
 /**
  * Configures and instantiates the Express application.
@@ -59,7 +102,10 @@ async function createApp({
     publishWebSocket = async () => {},
     onTelemetryPersisted = async () => {},
     onNodeStatusesChanged = async () => {},
+    onGatewayStatusChanged = async () => {},
     weatherContext = null,
+    alertService: providedAlertService = null,
+    databaseHealthCheck = async () => false,
     logger = console,
 } = {}) {
     const app = express();
@@ -84,11 +130,18 @@ async function createApp({
     app.use(express.static(path.join(__dirname, 'public')));
 
     // Service health check endpoint
-    app.get('/api/health', (req, res) => {
+    app.get('/api/health', async (req, res) => {
+        const databaseConnected = await databaseHealthCheck();
+        const mqttConnected = Boolean(mqttClient?.connected);
         res.status(200).json({
             success: true,
             service: 'classroom-monitoring-backend',
-            mqtt_connected: Boolean(mqttClient?.connected),
+            mqtt_connected: mqttConnected,
+            services: {
+                backend: { connected: true },
+                database: { connected: databaseConnected },
+                mqtt: { connected: mqttConnected },
+            },
         });
     });
 
@@ -97,7 +150,14 @@ async function createApp({
     app.use('/api/audit-logs', auditRoutes);
     app.use('/api/users', userRoutes);
     app.use('/api/automation', automationRoutes);
-    app.use('/api/alerts', alertRoutes);
+
+    const alertService = providedAlertService || new AlertService(new MySqlAlertRepository(database));
+    app.set('alertService', alertService);
+    app.use('/api/alerts', createAlertRouter({
+        service: alertService,
+        authenticate: verifyToken,
+        requireAdmin: requireRole('admin'),
+    }));
 
     // Register Dev 3 device control API routes
     app.use('/api', deviceRoutes);
@@ -122,6 +182,7 @@ async function createApp({
         publishWebSocket,
         onTelemetryPersisted,
         onNodeStatusesChanged,
+        onGatewayStatusChanged,
         logger,
     });
 
@@ -160,20 +221,30 @@ async function startServer(options = {}) {
     // soon as the single Socket.io instance below has been created.
     let realtime = null;
     let automationRuntime = null;
-    const publishWebSocket = options.publishWebSocket || (async (event, data) => {
-        if (!realtime) return undefined;
-        const roomId = data?.room_id || data?.roomId || 'P.101';
-        return realtime.publishToRoom(roomId, { event, data });
-    });
+    let monitoringAlerts = null;
+    const publishWebSocket = options.publishWebSocket
+        || createPublishWebSocket(() => realtime);
 
     const { app, dev2 } = await createApp({
         ...options,
         logger,
         mqttClient,
         weatherContext,
+        databaseHealthCheck: options.databaseHealthCheck || checkDatabaseHealth,
         publishWebSocket,
-        onTelemetryPersisted: async (input) => automationRuntime?.handleTelemetry(input),
-        onNodeStatusesChanged: async (input) => automationRuntime?.handleNodeStatuses(input),
+        onTelemetryPersisted: async (input) => {
+            await monitoringAlerts?.handleTelemetry(input);
+            try {
+                await automationRuntime?.handleTelemetry(input);
+            } catch (error) {
+                logger.error?.('Automation rule evaluation failed', { message: error.message });
+            }
+        },
+        onNodeStatusesChanged: async (input) => {
+            await monitoringAlerts?.handleNodeStatuses(input);
+            await automationRuntime?.handleNodeStatuses(input);
+        },
+        onGatewayStatusChanged: async (input) => monitoringAlerts?.handleGatewayStatus(input),
     });
 
     // Wrap Express application with HTTP server to attach Socket.io (Dev 3)
@@ -203,7 +274,8 @@ async function startServer(options = {}) {
     });
     app.set('deviceCommandService', deviceCommandService);
 
-    const alertService = new AlertService(new MySqlAlertRepository(database));
+    const alertService = app.get('alertService');
+    monitoringAlerts = new MonitoringAlertService({ alerts: alertService, realtime });
     const automationService = new AutomationService({
         alerts: alertService,
         realtime,
@@ -217,6 +289,7 @@ async function startServer(options = {}) {
     });
     app.set('automationService', automationService);
     app.set('automationRuntime', automationRuntime);
+    app.set('monitoringAlerts', monitoringAlerts);
 
     // Manage WebSocket connections and room subscriptions
     io.on('connection', (socket) => {
@@ -292,4 +365,4 @@ if (require.main === module) {
         });
 }
 
-module.exports = { createApp, startServer };
+module.exports = { createApp, createPublishWebSocket, startServer };
