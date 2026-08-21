@@ -1,0 +1,4 @@
+../Core/Src/stm_filter.c:32:14:filter_ema	2
+../Core/Src/stm_filter.c:50:14:filter_median_ema	10
+../Core/Src/stm_filter.c:78:6:stm_filter_init	1
+../Core/Src/stm_filter.c:89:6:stm_filter_apply_all	2

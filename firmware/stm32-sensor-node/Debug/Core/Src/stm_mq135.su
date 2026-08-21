@@ -1,0 +1,4 @@
+../Core/Src/stm_mq135.c:20:17:stmi_mq135_read_adc_raw	8	static
+../Core/Src/stm_mq135.c:34:14:stmi_mq135_calc_voltage	16	static
+../Core/Src/stm_mq135.c:44:14:stmi_mq135_calc_ppm	16	static
+../Core/Src/stm_mq135.c:58:14:stm_mq135_read_ppm	32	static

@@ -1,0 +1,4 @@
+../Core/Src/stm_ble_adv.c:11:21:stmi_uart_transmit_bytes	16	static
+../Core/Src/stm_ble_adv.c:23:14:stm_ble_init	40	static
+../Core/Src/stm_ble_adv.c:54:14:stm_ble_send_data	216	static
+../Core/Src/stm_ble_adv.c:94:14:stm_ble_send_advertising	8	static

@@ -1,0 +1,5 @@
+../Core/Src/stm_bh1750.c:18:21:stmi_bh1750_write_command	2
+../Core/Src/stm_bh1750.c:30:21:stmi_bh1750_read_bytes	2
+../Core/Src/stm_bh1750.c:43:14:stmi_bh1750_convert_to_lux	1
+../Core/Src/stm_bh1750.c:52:14:stm_bh1750_init	1
+../Core/Src/stm_bh1750.c:62:14:stm_bh1750_read_lux	3

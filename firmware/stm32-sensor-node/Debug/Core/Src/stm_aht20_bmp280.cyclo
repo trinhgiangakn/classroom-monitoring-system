@@ -1,0 +1,6 @@
+../Core/Src/stm_aht20_bmp280.c:49:21:stmi_aht20_read_raw_bytes	3
+../Core/Src/stm_aht20_bmp280.c:71:13:stmi_aht20_calc_temp_hum	1
+../Core/Src/stm_aht20_bmp280.c:85:21:stmi_bmp280_read_raw_pressure	2
+../Core/Src/stm_aht20_bmp280.c:103:14:stmi_bmp280_compensate_press	2
+../Core/Src/stm_aht20_bmp280.c:133:14:bmp280_read_calibration	4
+../Core/Src/stm_aht20_bmp280.c:177:14:stm_aht20_bmp280_read_data	5

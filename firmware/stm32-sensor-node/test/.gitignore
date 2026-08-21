@@ -1,0 +1,4 @@
+# Ignore compiled test runner executable
+*.exe
+*.o
+*.obj
