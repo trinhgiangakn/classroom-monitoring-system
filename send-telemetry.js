@@ -18,7 +18,31 @@ try {
   }
 }
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '.env'), quiet: true });
+let dotenv;
+try {
+  dotenv = require('./backend/node_modules/dotenv');
+} catch {
+  try {
+    dotenv = require('dotenv');
+  } catch {
+    dotenv = null;
+  }
+}
+if (dotenv) {
+  dotenv.config({ path: require('path').resolve(__dirname, '.env'), quiet: true });
+} else {
+  const fs = require('fs');
+  const envPath = require('path').resolve(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match && !process.env[match[1]]) {
+        process.env[match[1]] = match[2]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      }
+    }
+  }
+}
 
 const BROKER_URL = process.env.MQTT_URL || process.env.MQTT_BROKER_URL || 'mqtt://127.0.0.1:1883';
 const ROOM_ID = 'P.101';
