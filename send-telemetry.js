@@ -49,7 +49,14 @@ const ROOM_ID = 'P.101';
 const NODES = ['NODE-NW', 'NODE-NE', 'NODE-SW', 'NODE-SE'];
 
 let nodeIndex = 0;
-const client = mqtt.connect(BROKER_URL);
+const clientOptions = {
+  clientId: `send_telemetry_${Math.random().toString(16).substring(2, 8)}`,
+  clean: true,
+};
+if (process.env.MQTT_USERNAME) clientOptions.username = process.env.MQTT_USERNAME;
+if (process.env.MQTT_PASSWORD) clientOptions.password = process.env.MQTT_PASSWORD;
+
+const client = mqtt.connect(BROKER_URL, clientOptions);
 
 console.log('\n======================================================================');
 console.log('📡 SMART CLASSROOM - BỘ MÔ PHỎNG DỮ LIỆU CẢM BIẾN TỰ ĐỘNG (5 GIÂY/LẦN)');
