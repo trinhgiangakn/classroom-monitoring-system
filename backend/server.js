@@ -207,8 +207,14 @@ async function createApp({
  * @returns {Promise<{app: Express.Application, server: http.Server, dev2: Object, stop: Function}>} Server runtime objects.
  */
 async function startServer(options = {}) {
-    await database.testConnection();
     const logger = options.logger || console;
+    try {
+        const { runMigrations } = require('../scripts/migrate');
+        await runMigrations();
+    } catch (err) {
+        logger.warn?.('Auto database migration warning:', err.message);
+    }
+    await database.testConnection();
     const mqttClient = Object.prototype.hasOwnProperty.call(options, 'mqttClient')
         ? options.mqttClient
         : createMqttClient({ logger });

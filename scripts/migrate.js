@@ -33,7 +33,16 @@ function splitSqlStatements(script) {
 
 async function executeScript(connection, script) {
     for (const statement of splitSqlStatements(script)) {
-        await connection.query(statement);
+        try {
+            await connection.query(statement);
+        } catch (err) {
+            // Ignore duplicate column or key errors if column already exists
+            if (['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_CANT_DROP_FIELD_OR_KEY'].includes(err.code) || err.errno === 1060 || err.errno === 1061) {
+                console.log(`  [info] Ignored duplicate column/index: ${err.message}`);
+            } else {
+                throw err;
+            }
+        }
     }
 }
 
