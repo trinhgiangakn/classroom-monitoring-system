@@ -23,6 +23,13 @@ const pool = mysql.createPool({
     keepAliveInitialDelay: 30000, // Gửi keepalive sau 30s idle
 });
 
+// MySQL TIMESTAMP values are converted using the session time zone. Keep the
+// session and mysql2's `timezone: 'Z'` parser aligned so API dates are true UTC
+// instants instead of local wall-clock values incorrectly labelled with `Z`.
+pool.on('connection', connection => {
+    connection.query("SET time_zone = '+00:00'");
+});
+
 async function testConnection() {
     const connection = await pool.getConnection();
     connection.release();

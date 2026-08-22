@@ -62,6 +62,7 @@ export class MqttIngestion {
     publish,
     onTelemetryPersisted = async () => {},
     onNodeStatusesChanged = async () => {},
+    onGatewayStatusChanged = async () => {},
     logger = console,
   }) {
     if (!client?.on || !client?.subscribe) throw new TypeError('MQTT client is required')
@@ -72,6 +73,7 @@ export class MqttIngestion {
     this.publish = publish
     this.onTelemetryPersisted = onTelemetryPersisted
     this.onNodeStatusesChanged = onNodeStatusesChanged
+    this.onGatewayStatusChanged = onGatewayStatusChanged
     this.logger = logger
     this.started = false
     this.handleMessage = this.handleMessage.bind(this)
@@ -133,6 +135,10 @@ export class MqttIngestion {
       ) {
         const statuses = await this.service.nodeStatuses(context.roomId)
         await this.onNodeStatusesChanged({ roomId: context.roomId, statuses })
+      }
+
+      if ((context.type === 'gateway-status' || context.type === 'gateway-metrics') && result.gateway) {
+        await this.onGatewayStatusChanged({ roomId: context.roomId, gateway: result.gateway })
       }
     } catch (error) {
       this.logger.warn?.('Dev 2 rejected MQTT message', {

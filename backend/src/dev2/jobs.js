@@ -1,4 +1,8 @@
-import { NODE_OFFLINE_AFTER_SECONDS, RAW_RETENTION_DAYS } from './constants.js'
+import {
+  GATEWAY_OFFLINE_AFTER_SECONDS,
+  NODE_OFFLINE_AFTER_SECONDS,
+  RAW_RETENTION_DAYS,
+} from './constants.js'
 
 function startOfHour(date) {
   const value = new Date(date)
@@ -18,6 +22,7 @@ export class Dev2Jobs {
     service,
     publish,
     onNodeStatusesChanged = async () => {},
+    onGatewayStatusChanged = async () => {},
     logger = console,
     now = () => new Date(),
   }) {
@@ -27,21 +32,28 @@ export class Dev2Jobs {
     this.service = service
     this.publish = publish
     this.onNodeStatusesChanged = onNodeStatusesChanged
+    this.onGatewayStatusChanged = onGatewayStatusChanged
     this.logger = logger
     this.now = now
     this.timers = []
   }
 
   async runOfflineWatchdog() {
-    const cutoff = new Date(this.now().getTime() - NODE_OFFLINE_AFTER_SECONDS * 1000)
-    const events = await this.service.markOfflineNodes(cutoff)
-    for (const event of events) {
+    const now = this.now()
+    const nodeCutoff = new Date(now.getTime() - NODE_OFFLINE_AFTER_SECONDS * 1000)
+    const gatewayCutoff = new Date(now.getTime() - GATEWAY_OFFLINE_AFTER_SECONDS * 1000)
+    const nodeEvents = await this.service.markOfflineNodes(nodeCutoff)
+    const gatewayEvents = await this.service.markOfflineGateways(gatewayCutoff)
+    for (const event of [...nodeEvents, ...gatewayEvents]) {
       await this.publish(event.payload, { roomId: event.roomId, nodeId: event.nodeId })
     }
-    for (const roomId of new Set(events.map((event) => event.roomId))) {
+    for (const roomId of new Set(nodeEvents.map((event) => event.roomId))) {
       if (typeof this.service.nodeStatuses !== 'function') continue
       const statuses = await this.service.nodeStatuses(roomId)
       await this.onNodeStatusesChanged({ roomId, statuses })
+    }
+    for (const event of gatewayEvents) {
+      await this.onGatewayStatusChanged({ roomId: event.roomId, gateway: event.gateway })
     }
   }
 

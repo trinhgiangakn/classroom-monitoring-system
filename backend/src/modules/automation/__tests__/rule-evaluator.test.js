@@ -40,7 +40,7 @@ test('matches an advisory only when the configured outdoor weather threshold is 
         field: 'temperatureC',
         comparison: COMPARISON.GTE,
         threshold: 34,
-        severity: 'INFO',
+        severity: 'WARNING',
         message: 'Outdoor heat advisory',
       },
     },

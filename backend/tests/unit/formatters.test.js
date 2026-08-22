@@ -5,6 +5,7 @@ import {
   buildSensorUpdateEvent,
   formatLatestRow,
   formatNodeDetail,
+  formatRelativeSeconds,
   toCsv,
 } from '../../src/dev2/formatters.js'
 
@@ -110,4 +111,14 @@ test('node detail keeps node status separate from telemetry validity', () => {
 
   assert.equal(detail.status, 'Tín hiệu yếu')
   assert.equal(detail.latest_telemetry.status, 'Hợp lệ')
+})
+
+test('future liveness timestamps are reported as invalid instead of zero seconds', () => {
+  assert.equal(
+    formatRelativeSeconds(
+      new Date('2026-07-25T07:00:00Z'),
+      new Date('2026-07-25T00:00:00Z'),
+    ),
+    'Thời gian không hợp lệ',
+  )
 })

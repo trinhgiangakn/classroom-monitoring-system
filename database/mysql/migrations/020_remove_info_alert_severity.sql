@@ -1,0 +1,9 @@
+DELETE FROM alerts
+WHERE severity = 'INFO';
+
+UPDATE alerts
+SET severity = 'WARNING'
+WHERE severity IS NULL;
+
+ALTER TABLE alerts
+  MODIFY COLUMN severity ENUM('WARNING', 'CRITICAL') NOT NULL DEFAULT 'WARNING';

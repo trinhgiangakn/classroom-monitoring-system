@@ -1,9 +1,8 @@
-import { CheckCircle2, CircleAlert, Info } from 'lucide-react'
+import { CheckCircle2, CircleAlert } from 'lucide-react'
 import type { AlertItem } from '../../types/dashboard'
 
 const styleBySeverity = {
   warning: { icon: CircleAlert, className: 'border-amber-400/35 bg-amber-400/10 text-amber-200' },
-  info: { icon: Info, className: 'border-cyan-400/35 bg-cyan-400/10 text-cyan-100' },
   success: { icon: CheckCircle2, className: 'border-emerald-400/35 bg-emerald-400/10 text-emerald-100' },
 }
 
@@ -20,7 +19,7 @@ export function AlertList({ alerts }: { alerts: AlertItem[] }) {
 
       <div className="mt-4 space-y-3">
         {alerts.map((alert) => {
-          const { icon: Icon, className } = styleBySeverity[alert.severity]
+          const { icon: Icon, className } = styleBySeverity[alert.severity] ?? styleBySeverity.warning
           return (
             <article className={`rounded-xl border p-3 ${className}`} key={alert.id}>
               <div className="flex gap-2">

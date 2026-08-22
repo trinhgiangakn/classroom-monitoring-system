@@ -19,7 +19,7 @@ const rule = {
     field: 'temperatureC',
     comparison: COMPARISON.GTE,
     threshold: 34,
-    severity: 'INFO',
+    severity: 'WARNING',
     message: 'Outdoor heat advisory',
   },
 };
@@ -51,7 +51,7 @@ test('creates a weather advisory in MANUAL mode without dispatching a device com
 
   assert.equal(result.type, 'WEATHER_ADVISORY');
   assert.equal(alerts.length, 1);
-  assert.equal(alerts[0].severity, 'INFO');
+  assert.equal(alerts[0].severity, 'WARNING');
   assert.equal(commands.length, 0);
   assert.equal(events[0].payload.event, REALTIME_EVENT.ALERT_NEW);
 });

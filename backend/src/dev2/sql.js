@@ -42,7 +42,7 @@ export const SQL = Object.freeze({
       node_status = ?,
       sensor_health = ?,
       signal_rssi = COALESCE(?, signal_rssi),
-      last_seen_at = GREATEST(COALESCE(last_seen_at, ?), ?)
+      last_seen_at = UTC_TIMESTAMP(3)
     WHERE id = ?
   `,
 
@@ -54,7 +54,7 @@ export const SQL = Object.freeze({
       signal_rssi = COALESCE(?, signal_rssi),
       packet_success_rate = COALESCE(?, packet_success_rate),
       battery_percent = COALESCE(?, battery_percent),
-      last_seen_at = GREATEST(COALESCE(last_seen_at, ?), ?)
+      last_seen_at = UTC_TIMESTAMP(3)
     WHERE id = ?
   `,
 
@@ -179,9 +179,16 @@ export const SQL = Object.freeze({
   nodes: `
     SELECT
       sn.node_code AS node_id,
-      sn.node_status AS status,
+      CASE
+        WHEN sn.last_seen_at IS NULL
+          OR sn.last_seen_at < UTC_TIMESTAMP(3) - INTERVAL 15 SECOND
+          OR sn.last_seen_at > UTC_TIMESTAMP(3) + INTERVAL 60 SECOND
+        THEN 'OFFLINE'
+        ELSE sn.node_status
+      END AS status,
       sn.signal_rssi AS rssi,
       sn.packet_success_rate,
+      sn.battery_percent,
       sn.last_seen_at,
       sn.sensor_health,
       sn.location_label AS position
@@ -198,7 +205,13 @@ export const SQL = Object.freeze({
       sn.mac_address,
       sn.location_label AS position,
       sn.firmware_version,
-      sn.node_status AS node_status,
+      CASE
+        WHEN sn.last_seen_at IS NULL
+          OR sn.last_seen_at < UTC_TIMESTAMP(3) - INTERVAL 15 SECOND
+          OR sn.last_seen_at > UTC_TIMESTAMP(3) + INTERVAL 60 SECOND
+        THEN 'OFFLINE'
+        ELSE sn.node_status
+      END AS node_status,
       sn.sensor_health,
       sn.battery_percent,
       sn.signal_rssi AS rssi,
@@ -248,7 +261,7 @@ export const SQL = Object.freeze({
       wifi_rssi = ?,
       ip_address = ?,
       firmware_version = COALESCE(?, firmware_version),
-      last_seen_at = GREATEST(COALESCE(last_seen_at, ?), ?)
+      last_seen_at = UTC_TIMESTAMP(3)
     WHERE id = ?
   `,
 
@@ -271,9 +284,22 @@ export const SQL = Object.freeze({
   gatewayStatus: `
     SELECT
       g.gateway_code AS gateway_id,
-      IF(g.gateway_status = 'ONLINE' AND g.last_seen_at >= UTC_TIMESTAMP(3) - INTERVAL 60 SECOND, 'ONLINE', 'OFFLINE') AS status,
-      IF(g.last_seen_at >= UTC_TIMESTAMP(3) - INTERVAL 60 SECOND, g.wifi_connected, 0) AS wifi_connected,
-      IF(g.last_seen_at >= UTC_TIMESTAMP(3) - INTERVAL 60 SECOND, g.mqtt_connected, 0) AS mqtt_connected,
+      IF(
+        g.gateway_status = 'ONLINE'
+          AND g.last_seen_at BETWEEN UTC_TIMESTAMP(3) - INTERVAL 60 SECOND AND UTC_TIMESTAMP(3) + INTERVAL 60 SECOND,
+        'ONLINE',
+        'OFFLINE'
+      ) AS status,
+      IF(
+        g.last_seen_at BETWEEN UTC_TIMESTAMP(3) - INTERVAL 60 SECOND AND UTC_TIMESTAMP(3) + INTERVAL 60 SECOND,
+        g.wifi_connected,
+        0
+      ) AS wifi_connected,
+      IF(
+        g.last_seen_at BETWEEN UTC_TIMESTAMP(3) - INTERVAL 60 SECOND AND UTC_TIMESTAMP(3) + INTERVAL 60 SECOND,
+        g.mqtt_connected,
+        0
+      ) AS mqtt_connected,
       g.wifi_rssi AS wifi_signal_dbm,
       g.ip_address,
       g.firmware_version,
@@ -310,7 +336,28 @@ export const SQL = Object.freeze({
     JOIN rooms AS r ON r.id = sn.room_id
     WHERE sn.node_status <> 'OFFLINE'
       AND sn.last_seen_at IS NOT NULL
-      AND sn.last_seen_at < ?
+      AND (
+        sn.last_seen_at < ?
+        OR sn.last_seen_at > UTC_TIMESTAMP(3) + INTERVAL 60 SECOND
+      )
+    FOR UPDATE
+  `,
+
+  staleGatewaysForUpdate: `
+    SELECT
+      g.id,
+      r.room_code AS room_id,
+      g.gateway_code AS gateway_id,
+      g.wifi_rssi AS wifi_signal_dbm,
+      g.last_seen_at
+    FROM gateways AS g
+    JOIN rooms AS r ON r.id = g.room_id
+    WHERE g.gateway_status <> 'OFFLINE'
+      AND g.last_seen_at IS NOT NULL
+      AND (
+        g.last_seen_at < ?
+        OR g.last_seen_at > UTC_TIMESTAMP(3) + INTERVAL 60 SECOND
+      )
     FOR UPDATE
   `,
 })

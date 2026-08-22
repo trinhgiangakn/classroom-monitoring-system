@@ -120,8 +120,6 @@ export class IotRepository {
         sample.nodeStatus,
         sample.sensorHealth,
         sample.bleRssi,
-        sample.sampledAt,
-        sample.sampledAt,
         node.id,
       ])
 
@@ -166,8 +164,6 @@ export class IotRepository {
         status.rssi,
         status.packetSuccessRate,
         status.batteryPercent,
-        status.lastSeenAt,
-        status.lastSeenAt,
         node.id,
       ])
 
@@ -212,8 +208,6 @@ export class IotRepository {
         status.wifiRssi,
         status.ipAddress,
         status.firmwareVersion,
-        status.lastSeenAt,
-        status.lastSeenAt,
         gateway.id,
       ])
 
@@ -254,14 +248,12 @@ export class IotRepository {
       const rowCount = await firstRow(connection, 'SELECT ROW_COUNT() AS row_count', [])
 
       await connection.execute(SQL.updateGatewayStatus, [
-        gateway.gateway_status,
+        metrics.wifiConnected && metrics.mqttConnected ? 'ONLINE' : 'DEGRADED',
         metrics.wifiConnected,
         metrics.mqttConnected,
         metrics.wifiSignalDbm,
         gateway.ip_address,
         gateway.firmware_version,
-        metrics.recordedAt,
-        metrics.recordedAt,
         gateway.id,
       ])
 
@@ -284,6 +276,26 @@ export class IotRepository {
         nodes.map((node) => node.id),
       )
       return nodes.map((node) => ({ ...node, status: 'OFFLINE' }))
+    })
+  }
+
+  async markStaleGatewaysOffline(cutoff) {
+    return withTransaction(this.database, async (connection) => {
+      const [gateways] = await connection.execute(SQL.staleGatewaysForUpdate, [cutoff])
+      if (gateways.length === 0) return []
+      const placeholders = gateways.map(() => '?').join(', ')
+      await connection.execute(
+        `UPDATE gateways
+         SET gateway_status = 'OFFLINE', wifi_connected = 0, mqtt_connected = 0
+         WHERE id IN (${placeholders})`,
+        gateways.map((gateway) => gateway.id),
+      )
+      return gateways.map((gateway) => ({
+        ...gateway,
+        status: 'OFFLINE',
+        wifi_connected: 0,
+        mqtt_connected: 0,
+      }))
     })
   }
 
