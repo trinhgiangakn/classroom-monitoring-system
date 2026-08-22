@@ -109,4 +109,40 @@ async function handleDeviceStatus(statusData, topicDeviceId = null) {
     return commandService.handleDeviceStatus(statusData, topicDeviceId);
 }
 
-module.exports = { initMQTT, publishCommand, handleDeviceAck, handleDeviceStatus, isDeviceAckTopic };
+/**
+ * Publish updated automation rule thresholds to ESP32 Gateway via MQTT with QoS 1 and Retain flag.
+ * ESP32 reads this config topic to update its local EEPROM/Flash threshold rules.
+ */
+function publishThresholdConfig(roomId = ROOM_ID, configPayload = {}) {
+    if (!client || !client.connected) {
+        activeLogger.warn?.('Cannot publish threshold config; MQTT client is not connected.');
+        return false;
+    }
+
+    const topic = `classroom/${roomId}/config/thresholds`;
+    const payload = JSON.stringify({
+        event: 'CONFIG_UPDATE',
+        room_id: roomId,
+        ...configPayload,
+        timestamp: Math.floor(Date.now() / 1000),
+    });
+
+    client.publish(topic, payload, { qos: 1, retain: true }, (error) => {
+        if (error) {
+            activeLogger.error?.('Failed to publish threshold config to MQTT', { topic, message: error.message });
+        } else {
+            activeLogger.info?.(`Published rule threshold config to MQTT [${topic}]`);
+        }
+    });
+
+    return true;
+}
+
+module.exports = {
+    initMQTT,
+    publishCommand,
+    publishThresholdConfig,
+    handleDeviceAck,
+    handleDeviceStatus,
+    isDeviceAckTopic,
+};

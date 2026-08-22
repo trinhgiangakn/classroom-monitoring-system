@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
+const mqttService = require('../src/services/mqttService');
 
 const DEVICE_NAME_MAP = {
     FAN_01: 'Quạt thông gió',
@@ -94,10 +95,28 @@ router.put('/rules/:id/toggle', verifyToken, requireRole('admin', 'manager'), as
             ]
         ).catch(() => {});
 
+        // Publish updated config payload to MQTT HiveMQ Broker for ESP32 hardware
+        const [allRules] = await db.query('SELECT rule_id, device_id, conditions, is_enabled FROM automation_rules WHERE room_code = ?', ['P.101']);
+        const rulesList = allRules.map(r => ({
+            rule_id: r.rule_id,
+            device_id: r.device_id,
+            is_enabled: Boolean(r.is_enabled),
+            conditions: typeof r.conditions === 'string' ? JSON.parse(r.conditions) : r.conditions,
+        }));
+
+        const mqttPublished = mqttService.publishThresholdConfig('P.101', {
+            event: 'RULE_TOGGLE',
+            toggled_rule_id: Number(ruleId),
+            toggled_enabled: Boolean(newEnabled),
+            rules: rulesList,
+            updated_by: req.user?.username || 'admin',
+        });
+
         res.json({
             success: true,
             rule_id: ruleId,
             enabled: Boolean(newEnabled),
+            mqtt_published: mqttPublished,
             message: `Đã ${newEnabled ? 'bật' : 'tắt'} ${ruleName} thành công.`
         });
     } catch (error) {
@@ -210,9 +229,33 @@ router.put('/thresholds', verifyToken, requireRole('admin', 'manager'), async (r
             ]
         ).catch(() => {});
 
+        // Publish updated threshold config payload to MQTT HiveMQ Broker for ESP32 hardware
+        const [updatedRules] = await db.query('SELECT rule_id, device_id, conditions, is_enabled FROM automation_rules WHERE room_code = ?', ['P.101']);
+        const rulesList = updatedRules.map(r => ({
+            rule_id: r.rule_id,
+            device_id: r.device_id,
+            is_enabled: Boolean(r.is_enabled),
+            conditions: typeof r.conditions === 'string' ? JSON.parse(r.conditions) : r.conditions,
+        }));
+
+        const mqttPublished = mqttService.publishThresholdConfig('P.101', {
+            event: 'THRESHOLDS_UPDATE',
+            thresholds: {
+                temp_on: tempOn !== undefined ? Number(tempOn) : undefined,
+                temp_off: tempOff !== undefined ? Number(tempOff) : undefined,
+                humidity_on: humidityOn !== undefined ? Number(humidityOn) : undefined,
+                humidity_off: humidityOff !== undefined ? Number(humidityOff) : undefined,
+                light_curtain_close: lightCurtainClose !== undefined ? Number(lightCurtainClose) : undefined,
+                light_lamp_on: lightLampOn !== undefined ? Number(lightLampOn) : undefined,
+            },
+            rules: rulesList,
+            updated_by: req.user?.username || 'admin',
+        });
+
         res.json({
             success: true,
-            message: 'Đã lưu cấu hình ngưỡng kích hoạt tự động thành công!',
+            mqtt_published: mqttPublished,
+            message: 'Đã lưu cấu hình ngưỡng kích hoạt tự động thành công và gửi thông tin cấu hình xuống MQTT ESP32 Gateway!',
             data: {
                 tempOn: Number(tempOn),
                 tempOff: Number(tempOff),

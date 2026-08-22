@@ -100,10 +100,11 @@ client.on('connect', () => {
     }, 10_000);
 
     const commandTopic = `${ROOM_TOPIC_PREFIX}/+/command`;
-    client.subscribe(commandTopic, { qos: 1 }, (err) => {
+    const configTopic = `classroom/${ROOM_ID}/config/thresholds`;
+    client.subscribe([commandTopic, configTopic], { qos: 1 }, (err) => {
         if (!err) {
-            console.log(`[ESP32 SIMULATOR] 👂 Listening on: ${commandTopic}`);
-            console.log(`[ESP32 SIMULATOR] Ready — bấm Bật/Tắt thiết bị trên Web để test!\n`);
+            console.log(`[ESP32 SIMULATOR] 👂 Listening on: ${commandTopic} and ${configTopic}`);
+            console.log(`[ESP32 SIMULATOR] Ready — bấm Bật/Tắt thiết bị hoặc chỉnh ngưỡng trên Web để test!\n`);
         } else {
             console.error('[ESP32 SIMULATOR] Subscription error:', err.message);
         }
@@ -125,12 +126,35 @@ function actionToState(action) {
 }
 
 /**
- * Handle incoming command messages from backend server.
+ * Handle incoming command & config messages from backend server.
  */
 client.on('message', (topic, message) => {
     try {
-        const command = JSON.parse(message.toString());
-        const { command_id, device_id, action, source } = command;
+        const payload = JSON.parse(message.toString());
+
+        if (topic.endsWith('/config/thresholds')) {
+            console.log(`\n[ESP32 SIMULATOR] ⚙️ Received Threshold Config Update via MQTT:`);
+            console.log(`   Topic:     ${topic}`);
+            console.log(`   Event:     ${payload.event}`);
+            console.log(`   UpdatedBy: ${payload.updated_by}`);
+            if (payload.thresholds) {
+                console.log(`   Thresholds:`, payload.thresholds);
+            }
+
+            const configAckTopic = `classroom/${ROOM_ID}/config/ack`;
+            const ackPayload = {
+                event: 'CONFIG_ACK',
+                room_id: ROOM_ID,
+                status: 'SUCCESS',
+                stored_in_eeprom: true,
+                timestamp: Math.floor(Date.now() / 1000),
+            };
+            client.publish(configAckTopic, JSON.stringify(ackPayload), { qos: 1 });
+            console.log(`[ESP32 SIMULATOR] ✅ EEPROM Config ACK sent → [${configAckTopic}]\n`);
+            return;
+        }
+
+        const { command_id, device_id, action, source } = payload;
 
         console.log(`\n[ESP32 SIMULATOR] 📩 Received command:`);
         console.log(`   Topic:     ${topic}`);
@@ -162,7 +186,7 @@ client.on('message', (topic, message) => {
         }, executionTimeMs);
 
     } catch (error) {
-        console.error('[ESP32 SIMULATOR] Error processing command:', error.message);
+        console.error('[ESP32 SIMULATOR] Error processing message:', error.message);
     }
 });
 
