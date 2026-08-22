@@ -7,14 +7,13 @@ const require = createRequire(import.meta.url)
 const { attachMqttIngestion, buildMqttOptions } = require('../../config/mqtt.js')
 
 test('builds MQTT runtime options without inventing credentials', () => {
-  assert.deepEqual(buildMqttOptions({ MQTT_CLIENT_ID: 'backend-test' }), {
-    clientId: 'backend-test',
-    clean: true,
-    connectTimeout: 10_000,
-    reconnectPeriod: 2_000,
-    resubscribe: true,
-    queueQoSZero: false,
-  })
+  const options = buildMqttOptions({ MQTT_CLIENT_ID: 'backend-test' })
+  assert.match(options.clientId, /^backend-test-[0-9a-f]{6}$/)
+  assert.equal(options.clean, true)
+  assert.equal(options.connectTimeout, 10_000)
+  assert.equal(options.reconnectPeriod, 2_000)
+  assert.equal(options.resubscribe, true)
+  assert.equal(options.queueQoSZero, false)
 })
 
 test('starts ingestion on connect and stops both ingestion and client', async () => {
