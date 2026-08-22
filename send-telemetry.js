@@ -20,7 +20,7 @@ try {
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env'), quiet: true });
 
-const BROKER_URL = process.env.MQTT_URL || process.env.MQTT_BROKER_URL || 'mqtt://broker.emqx.io:1883';
+const BROKER_URL = process.env.MQTT_URL || process.env.MQTT_BROKER_URL || 'mqtt://127.0.0.1:1883';
 const ROOM_ID = 'P.101';
 const NODES = ['NODE-NW', 'NODE-NE', 'NODE-SW', 'NODE-SE'];
 
