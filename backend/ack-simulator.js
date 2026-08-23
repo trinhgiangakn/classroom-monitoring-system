@@ -121,6 +121,8 @@ function actionToState(action) {
         OPEN:     'OPENING',
         CLOSE:    'CLOSING',
         STOP:     'STOPPED',
+        RESUME:   'AUTO_MODE',
+        PAUSE:    'MANUAL_MODE',
     };
     return map[action] ?? 'UNKNOWN';
 }

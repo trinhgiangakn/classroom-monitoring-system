@@ -138,11 +138,35 @@ function publishThresholdConfig(roomId = ROOM_ID, configPayload = {}) {
     return true;
 }
 
+/**
+ * Publish mode change command payload to ESP32 Gateway via MQTT using QoS 1.
+ * Topic: classroom/{roomId}/device/ALL/command
+ */
+function publishModeChange(roomId = ROOM_ID, modePayload = {}) {
+    if (!client || !client.connected) {
+        activeLogger.warn?.('Cannot publish mode change; MQTT client is not connected.');
+        return false;
+    }
+
+    const topic = `classroom/${roomId}/device/ALL/command`;
+    client.publish(topic, JSON.stringify(modePayload), { qos: 1 }, (error) => {
+        if (error) {
+            activeLogger.error?.('Failed to publish mode change to MQTT', { topic, message: error.message });
+        } else {
+            activeLogger.info?.(`Published mode change command to MQTT [${topic}]`);
+        }
+    });
+
+    return true;
+}
+
 module.exports = {
     initMQTT,
     publishCommand,
     publishThresholdConfig,
+    publishModeChange,
     handleDeviceAck,
     handleDeviceStatus,
     isDeviceAckTopic,
 };
+

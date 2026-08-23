@@ -1,5 +1,7 @@
+const { randomUUID } = require('crypto');
 const deviceService = require('../services/deviceService');
 const { DeviceCommandError } = require('../services/deviceCommandService');
+const mqttService = require('../services/mqttService');
 
 /**
  * GET /api/devices
@@ -57,17 +59,40 @@ async function setOperationMode(req, res) {
 
         await deviceService.updateOperationMode(mode);
 
+        // Broadcast MQTT mode change payload to HiveMQ Broker for ESP32 Gateway
+        const commandId = `CMD-${randomUUID()}`;
+        const requestedBy = req.user?.username || 'admin';
+        const action = mode === 'AUTO' ? 'RESUME' : 'PAUSE';
+        const source = mode;
+        const reason = mode === 'AUTO' ? 'user_switched_to_auto' : 'user_switched_to_manual';
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        const modePayload = {
+            command_id: commandId,
+            device_id: 'ALL',
+            action,
+            requested_by: requestedBy,
+            source,
+            reason,
+            timestamp,
+        };
+
+        const mqttPublished = mqttService.publishModeChange(room_id, modePayload);
+
         // Notify realtime room subscribers if WebSocket is initialized
         const realtime = req.app.get('realtime');
         realtime?.publishToRoom(room_id, {
             event: 'mode:update',
-            data: { room_id, current_mode: mode }
+            data: { room_id, current_mode: mode, payload: modePayload }
         });
 
         return res.status(200).json({
             success: true,
             room_id,
             current_mode: mode,
+            command_id: commandId,
+            mqtt_published: mqttPublished,
+            payload: modePayload,
             message: mode === 'MANUAL'
                 ? 'Đã chuyển sang chế độ MANUAL. Nút bấm điều khiển tay đã được mở khóa.'
                 : 'Đã chuyển sang chế độ AUTO. Các điều khiển thủ công đã bị khóa.'
@@ -77,6 +102,7 @@ async function setOperationMode(req, res) {
         return res.status(500).json({ success: false, message: 'Internal server error' });
     }
 }
+
 
 /**
  * POST /api/devices/:id/control
