@@ -74,10 +74,10 @@ export function Sidebar() {
     <aside className="flex w-full shrink-0 flex-col border-b border-slate-800 bg-[#08182e] lg:min-h-screen lg:w-64 lg:border-r lg:border-b-0">
       <div className="flex items-center gap-3 px-5 py-5">
         <div className="grid size-10 place-items-center rounded-xl border border-cyan-400/50 bg-cyan-400/10 font-bold text-cyan-300">
-          SC
+          CM
         </div>
         <div>
-          <p className="text-sm font-bold tracking-wide text-cyan-300">SMART CLASS</p>
+          <p className="text-sm font-bold tracking-wide text-cyan-300">CLASSROOM MONITORING</p>
           <p className="text-xs text-slate-400">Giám sát & điều khiển</p>
         </div>
       </div>
