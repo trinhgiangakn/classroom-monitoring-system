@@ -86,6 +86,36 @@ class DeviceCommandService {
       throw new DeviceCommandError('MQTT gateway is unavailable', 503);
     }
 
+    // In AUTO mode the ESP32 firmware rule engine controls relays directly and
+    // rejects all incoming MQTT commands. No ACK will ever arrive, so we
+    // immediately perform an optimistic state update instead of waiting for a
+    // timeout that would leave the web UI stale.
+    if (source === 'AUTO') {
+      const actionStateMap = { TURN_ON: 'ON', TURN_OFF: 'OFF', OPEN: 'OPENING', CLOSE: 'CLOSING', STOP: 'STOPPED' };
+      const optimisticState = actionStateMap[action] ?? 'ON';
+      await this.devices.updateCommandResult(commandId, { status: 'SUCCESS', executionTimeMs: 0 });
+      await this.devices.updateActualState(deviceId, optimisticState);
+      await this.#publishCommandUpdate({
+        roomId,
+        commandId,
+        deviceId,
+        action,
+        source,
+        status: 'SUCCESS',
+        executionTimeMs: 0,
+        actualState: optimisticState,
+      });
+      return {
+        commandId,
+        deviceId,
+        action,
+        source,
+        status: 'SUCCESS',
+        actualState: optimisticState,
+        deviceName: device.name ?? null,
+      };
+    }
+
     this.pendingTimers.set(commandId, this.setTimer(() => {
       void this.#handleTimeout({ commandId, roomId, deviceId, action, source });
     }, this.ackTimeoutMs));
