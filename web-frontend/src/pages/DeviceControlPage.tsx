@@ -12,7 +12,8 @@ import {
   VenetianMask,
   Wind,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { subscribeToRealtime } from '../services/socket'
 import {
   controlDevice,
   getDeviceCommands,
@@ -66,20 +67,55 @@ export function DeviceControlPage() {
     }
   }
 
+  // Keep a stable reference to devices so WebSocket handlers can access latest state
+  const devicesRef = useRef<DeviceDto[]>([])
+  useEffect(() => { devicesRef.current = devices }, [devices])
+
   useEffect(() => {
     let active = true
     loadData(true)
 
-    // Auto-polling data every 3 seconds
+    // Auto-polling every 5 seconds (WebSocket handles the fast realtime updates)
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible' && active) {
         loadData(false)
       }
-    }, 3000)
+    }, 5000)
+
+    // ── Realtime WebSocket subscriptions ──────────────────────────────────
+    // Backend broadcasts 'device:status' when AUTO mode automation changes a relay.
+    // Backend broadcasts 'device:command-update' when a command result arrives.
+    const unsubStatus = subscribeToRealtime(['device:status'], (payload) => {
+      const data = (payload as any)?.data ?? payload
+      const deviceId: string | undefined = data?.device_id
+      const actualState: string | undefined = data?.actual_state
+      if (!deviceId || !actualState) return
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.device_id === deviceId ? { ...d, actual_state: actualState } : d
+        )
+      )
+    })
+
+    const unsubCmd = subscribeToRealtime(['device:command-update'], (payload) => {
+      const data = (payload as any)?.data ?? payload
+      const deviceId: string | undefined = data?.device_id
+      const actualState: string | undefined = data?.actual_state
+      if (!deviceId || !actualState) return
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.device_id === deviceId ? { ...d, actual_state: actualState } : d
+        )
+      )
+      // Refresh command history list when a new command result arrives
+      getDeviceCommands(10).then((cmds) => setCommands(cmds)).catch(() => {})
+    })
 
     return () => {
       active = false
       clearInterval(interval)
+      unsubStatus()
+      unsubCmd()
     }
   }, [])
 
