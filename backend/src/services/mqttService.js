@@ -39,22 +39,28 @@ function initMQTT({ app, mqttClient, logger = console }) {
     activeLogger = logger;
     const ackTopic = `${ROOM_TOPIC_PREFIX}/+/ack`;
     const statusTopic = `${ROOM_TOPIC_PREFIX}/+/status`;
+    const gatewayAckTopic = `classroom/${ROOM_ID}/gateway/ack`;
 
     const subscribeToTopics = () => {
-        client.subscribe([ackTopic, statusTopic], { qos: 1 }, (error) => {
+        client.subscribe([ackTopic, statusTopic, gatewayAckTopic], { qos: 1 }, (error) => {
             if (error) {
-                activeLogger.error?.('Device MQTT subscriptions failed', { message: error.message });
+                activeLogger.error?.('Device & Gateway MQTT subscriptions failed', { message: error.message });
                 return;
             }
-            activeLogger.info?.(`DEV 3 subscribed to ${ackTopic} and ${statusTopic}`);
+            activeLogger.info?.(`DEV 3 subscribed to ${ackTopic}, ${statusTopic}, and ${gatewayAckTopic}`);
         });
     };
 
     const handleMessage = async (topic, message) => {
-        const topicDeviceId = extractDeviceIdFromTopic(topic);
-        if (!topicDeviceId) return;
         try {
             const payload = JSON.parse(message.toString());
+            if (topic === gatewayAckTopic) {
+                await handleGatewayAck(payload);
+                return;
+            }
+
+            const topicDeviceId = extractDeviceIdFromTopic(topic);
+            if (!topicDeviceId) return;
             if (isDeviceStatusTopic(topic)) {
                 await handleDeviceStatus(payload, topicDeviceId);
             } else if (isDeviceAckTopic(topic)) {
@@ -89,6 +95,29 @@ function publishCommand(deviceId, commandPayload) {
         if (error) activeLogger.error?.('Device command publish failed', { topic, message: error.message });
     });
     return true;
+}
+
+/** Process an ESP32 Gateway ACK (CONFIG_ACK or Mode Change COMMAND_ACK). */
+async function handleGatewayAck(ackData) {
+    activeLogger.info?.('Received ESP32 Gateway ACK', ackData);
+    const realtime = expressApp?.get('realtime');
+
+    if (ackData.event === 'CONFIG_ACK') {
+        realtime?.publishToRoom(ROOM_ID, {
+            event: 'gateway:config-ack',
+            data: ackData,
+        });
+    } else if (ackData.event === 'COMMAND_ACK') {
+        const commandService = expressApp?.get('deviceCommandService');
+        if (commandService) {
+            await commandService.handleAck(ackData, 'GATEWAY');
+        } else {
+            realtime?.publishToRoom(ROOM_ID, {
+                event: 'gateway:mode-ack',
+                data: ackData,
+            });
+        }
+    }
 }
 
 /** Process an ESP32 ACK and notify WebSocket clients plus DEV 4 alert logic. */
@@ -166,6 +195,7 @@ module.exports = {
     publishThresholdConfig,
     publishModeChange,
     handleDeviceAck,
+    handleGatewayAck,
     handleDeviceStatus,
     isDeviceAckTopic,
 };
