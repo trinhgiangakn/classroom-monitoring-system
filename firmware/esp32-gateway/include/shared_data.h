@@ -12,7 +12,7 @@ struct node_data_t {
 
 // Threshold configuration structure for automation logic.
 struct threshold_config_t {
-    float thresh_temp, thresh_humid, thresh_light_low, thresh_light_high, thresh_api, thresh_pressure;   
+    float thresh_temp_max, thresh_temp_min, thresh_humid_max, thresh_humid_min, thresh_light_high, thresh_light_low;   
 };
 
 // Global variables for sensor cache, mutexes, and configuration.

@@ -12,7 +12,6 @@ void tearDown(void) {}
 void test_feature_timeout(void) {
     update_node_data(1, 26.0, 55.0, 400.0, 45.0, 1010.0);
     
-    // Giả lập lùi thời gian cập nhật về quá khứ (vượt quá 5 phút timeout)
     node_cache[1].last_update = millis() - (NODE_TIMEOUT_MS + 1000); 
     
     bool is_timeout = ((millis() - node_cache[1].last_update) > NODE_TIMEOUT_MS);

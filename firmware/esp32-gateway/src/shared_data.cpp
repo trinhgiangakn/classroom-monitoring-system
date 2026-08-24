@@ -8,7 +8,7 @@ Preferences nvs;
 
 // Global variables for system configuration and state.
 volatile bool is_mqtt_connected = false;
-threshold_config_t system_thresh = {35.0, 80.0, 200.0, 800.0, 1000.0, 1000.0};
+threshold_config_t system_thresh = {30.0, 28.0, 60.0, 50.0, 800.0, 300.0};
 bool is_auto_mode = true;
 
 // Function to initialize the sensor cache and mutexes.

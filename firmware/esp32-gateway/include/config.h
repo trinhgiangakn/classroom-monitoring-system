@@ -34,8 +34,8 @@
 #define RELAY_HUMIDIFIER  7
 
 // Relay states
-#define RELAY_ON  HIGH
-#define RELAY_OFF LOW  
+#define RELAY_ON  LOW
+#define RELAY_OFF HIGH  
 
 // Timeout for considering a node offline (in milliseconds)
 #define NODE_TIMEOUT_MS 300000 

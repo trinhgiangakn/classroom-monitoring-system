@@ -10,13 +10,13 @@
 void setup() {
     Serial.begin(115200);
 
-    // Initialize relay pins and set them to OFF state.
+    // Set relay pins as OUTPUT.
     pinMode(RELAY_FAN, OUTPUT);
     pinMode(RELAY_LIGHT, OUTPUT);
     pinMode(RELAY_CURTAIN, OUTPUT);
     pinMode(RELAY_HUMIDIFIER, OUTPUT);
 
-    // Ensure all relays are turned off at startup.
+    // Set all relays to OFF state initially.
     digitalWrite(RELAY_FAN, RELAY_OFF);
     digitalWrite(RELAY_LIGHT, RELAY_OFF);
     digitalWrite(RELAY_CURTAIN, RELAY_OFF);
