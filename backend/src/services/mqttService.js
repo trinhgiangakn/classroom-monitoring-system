@@ -149,8 +149,9 @@ function publishThresholdConfig(roomId = ROOM_ID, configPayload = {}) {
     }
 
     const topic = `classroom/${roomId}/config/thresholds`;
+    const fallbackTopic = `classroom/${roomId}/device/ALL/command`;
     const payload = JSON.stringify({
-        event: 'CONFIG_UPDATE',
+        event: 'THRESHOLDS_UPDATE',
         room_id: roomId,
         ...configPayload,
         timestamp: Math.floor(Date.now() / 1000),
@@ -161,6 +162,14 @@ function publishThresholdConfig(roomId = ROOM_ID, configPayload = {}) {
             activeLogger.error?.('Failed to publish threshold config to MQTT', { topic, message: error.message });
         } else {
             activeLogger.info?.(`Published rule threshold config to MQTT [${topic}]`);
+        }
+    });
+
+    client.publish(fallbackTopic, payload, { qos: 1 }, (error) => {
+        if (error) {
+            activeLogger.error?.('Failed to publish fallback threshold config to MQTT', { topic: fallbackTopic, message: error.message });
+        } else {
+            activeLogger.info?.(`Published fallback threshold config to MQTT [${fallbackTopic}]`);
         }
     });
 
