@@ -108,7 +108,6 @@ router.put('/rules/:id/toggle', verifyToken, requireRole('admin', 'manager'), as
             event: 'RULE_TOGGLE',
             toggled_rule_id: Number(ruleId),
             toggled_enabled: Boolean(newEnabled),
-            rules: rulesList,
             updated_by: req.user?.username || 'admin',
         });
 
@@ -248,7 +247,6 @@ router.put('/thresholds', verifyToken, requireRole('admin', 'manager'), async (r
                 light_curtain_close: lightCurtainClose !== undefined ? Number(lightCurtainClose) : undefined,
                 light_lamp_on: lightLampOn !== undefined ? Number(lightLampOn) : undefined,
             },
-            rules: rulesList,
             updated_by: req.user?.username || 'admin',
         });
 
