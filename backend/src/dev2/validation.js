@@ -194,14 +194,14 @@ export function parseGatewayMetricsPayload(value, context) {
   const freeRam = Number(payload.free_ram)
   const ramPercent = payload.ram_heap_percent !== undefined
     ? Number(payload.ram_heap_percent)
-    : (Number.isFinite(freeRam) && freeRam > 0 ? Math.max(10, Math.min(95, Math.round((1 - freeRam / 320000) * 100))) : 50)
+    : (Number.isFinite(freeRam) && freeRam > 0 ? Math.max(10, Math.min(95, Math.round((1 - freeRam / 320000) * 100))) : null)
 
   return {
     roomId: parseRoomId(payload.room_id, context.roomId),
     gatewayId: optionalString(payload.gateway_id ?? 'GW-P101-01', 'gateway_id', GATEWAY_ID_PATTERN),
-    cpuUsagePercent: finiteNumber(payload.cpu_usage_percent ?? 30, 'cpu_usage_percent', { min: 0, max: 100 }),
-    ramHeapPercent: finiteNumber(ramPercent, 'ram_heap_percent', { min: 0, max: 100 }),
-    mqttQueuePercent: finiteNumber(payload.mqtt_queue_percent ?? 10, 'mqtt_queue_percent', { min: 0, max: 100 }),
+    cpuUsagePercent: finiteNumber(payload.cpu_usage_percent, 'cpu_usage_percent', { min: 0, max: 100, optional: true }),
+    ramHeapPercent: finiteNumber(ramPercent, 'ram_heap_percent', { min: 0, max: 100, optional: true }),
+    mqttQueuePercent: finiteNumber(payload.mqtt_queue_percent, 'mqtt_queue_percent', { min: 0, max: 100, optional: true }),
     wifiSignalDbm: finiteNumber(payload.wifi_signal_dbm ?? payload.wifi_rssi ?? -65, 'wifi_signal_dbm', { min: -127, max: 20 }),
     wifiConnected: payload.wifi_connected === undefined ? true : Boolean(payload.wifi_connected),
     mqttConnected: payload.mqtt_connected === undefined ? true : Boolean(payload.mqtt_connected),

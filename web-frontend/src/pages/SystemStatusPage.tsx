@@ -145,7 +145,10 @@ export function SystemStatusPage() {
 
         <section className="rounded-2xl border border-slate-800 bg-[#0c1d37] p-4 sm:p-5">
           <div className="flex items-center gap-2"><Activity aria-hidden="true" className="size-5 text-violet-300" /><h2 className="font-bold text-slate-100">Chỉ số vận hành Gateway</h2></div>
-          <div className="mt-5 space-y-5"><Progress label="Gateway CPU" value={gateway?.cpuUsagePercent} tone="bg-cyan-400" /><Progress label="Gateway RAM heap" value={gateway?.ramHeapPercent} tone="bg-violet-400" /><Progress label="MQTT queue" value={gateway?.mqttQueuePercent} tone="bg-emerald-400" /></div>
+          <div className="mt-5 space-y-5">
+            <Progress label="Gateway RAM heap" value={gateway?.status === 'Online' ? gateway?.ramHeapPercent : null} tone="bg-violet-400" />
+            <Progress label="MQTT queue" value={gateway?.status === 'Online' ? gateway?.mqttQueuePercent : null} tone="bg-emerald-400" />
+          </div>
           <div className="mt-6 rounded-xl border border-cyan-400/25 bg-cyan-400/10 p-3 text-sm text-cyan-100"><p className="font-bold">Gateway {gateway?.gatewayId ?? 'chưa xác định'}</p><p className="mt-1 text-xs">Cập nhật {gateway?.lastSeen ?? 'chưa có dữ liệu'} · Wi-Fi {gateway?.wifiConnected ? 'đã kết nối' : 'mất kết nối'}.</p></div>
         </section>
       </div>
