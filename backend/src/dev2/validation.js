@@ -191,21 +191,49 @@ export function parseGatewayMetricsPayload(value, context) {
   const payload = plainObject(value)
   ensureTopicIdentity(payload, context)
   const ts = payload.timestamp ?? Math.floor(Date.now() / 1000)
-  const freeRam = Number(payload.free_ram)
+
+  // --- RAM heap ---
+  // ESP32 gửi: free_heap (bytes) hoặc free_ram (bytes)
+  // Backend cũ expect: ram_heap_percent hoặc tính từ free_ram
+  const freeRamRaw = payload.free_heap ?? payload.free_ram
+  const freeRam = freeRamRaw !== undefined ? Number(freeRamRaw) : NaN
   const ramPercent = payload.ram_heap_percent !== undefined
     ? Number(payload.ram_heap_percent)
-    : (Number.isFinite(freeRam) && freeRam > 0 ? Math.max(10, Math.min(95, Math.round((1 - freeRam / 320000) * 100))) : null)
+    : (Number.isFinite(freeRam) && freeRam > 0
+        ? Math.max(10, Math.min(95, Math.round((1 - freeRam / 320000) * 100)))
+        : null)
+
+  // --- MQTT queue ---
+  // ESP32 gửi: queue_waiting + queue_free  (counts)
+  // Backend cũ expect: mqtt_queue_percent
+  let mqttQueuePct = null
+  if (payload.mqtt_queue_percent !== undefined) {
+    mqttQueuePct = Number(payload.mqtt_queue_percent)
+  } else if (payload.queue_waiting !== undefined || payload.queue_free !== undefined) {
+    const waiting = Math.max(0, Number(payload.queue_waiting ?? 0))
+    const free = Math.max(0, Number(payload.queue_free ?? 15))
+    const total = waiting + free
+    mqttQueuePct = total > 0 ? Math.round((waiting / total) * 100) : 0
+  }
+
+  // --- Uptime ---
+  // ESP32 gửi: uptime_ms  →  convert sang seconds
+  let uptimeRaw = payload.uptime_seconds ?? payload.uptime
+  if (uptimeRaw === undefined && payload.uptime_ms !== undefined) {
+    uptimeRaw = Math.floor(Number(payload.uptime_ms) / 1000)
+  }
 
   return {
     roomId: parseRoomId(payload.room_id, context.roomId),
     gatewayId: optionalString(payload.gateway_id ?? 'GW-P101-01', 'gateway_id', GATEWAY_ID_PATTERN),
     cpuUsagePercent: finiteNumber(payload.cpu_usage_percent, 'cpu_usage_percent', { min: 0, max: 100, optional: true }),
     ramHeapPercent: finiteNumber(ramPercent, 'ram_heap_percent', { min: 0, max: 100, optional: true }),
-    mqttQueuePercent: finiteNumber(payload.mqtt_queue_percent, 'mqtt_queue_percent', { min: 0, max: 100, optional: true }),
+    mqttQueuePercent: finiteNumber(mqttQueuePct, 'mqtt_queue_percent', { min: 0, max: 100, optional: true }),
     wifiSignalDbm: finiteNumber(payload.wifi_signal_dbm ?? payload.wifi_rssi ?? -65, 'wifi_signal_dbm', { min: -127, max: 20 }),
     wifiConnected: payload.wifi_connected === undefined ? true : Boolean(payload.wifi_connected),
     mqttConnected: payload.mqtt_connected === undefined ? true : Boolean(payload.mqtt_connected),
-    uptimeSeconds: finiteNumber(payload.uptime_seconds ?? payload.uptime ?? 0, 'uptime_seconds', { min: 0 }),
+    uptimeSeconds: finiteNumber(uptimeRaw ?? 0, 'uptime_seconds', { min: 0 }),
     recordedAt: epochSeconds(ts),
   }
 }
+
