@@ -115,59 +115,117 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
         return; 
     }
 
-    // Handle command messages for device control
+    // Handle command messages for device control or mode change (AUTO/MANUAL)
     if (doc.containsKey("action") && doc.containsKey("command_id")) {
         const char* cmd_id = doc["command_id"];
         const char* dev_id = doc.containsKey("device_id") ? doc["device_id"].as<const char*>() : "GATEWAY";
         const char* action = doc["action"];
 
-        uint32_t start_time = micros();
-        int relay_pin = -1;
-        bool is_on = false;
+        bool is_switching_mode = false;
+        const char* target_mode = nullptr;
 
-        if (strcmp(dev_id, "FAN_01") == 0)             { relay_pin = RELAY_FAN; }
-        else if (strcmp(dev_id, "LIGHT_01") == 0)      { relay_pin = RELAY_LIGHT; }
-        else if (strcmp(dev_id, "CURTAIN_01") == 0)    { relay_pin = RELAY_CURTAIN; }
-        else if (strcmp(dev_id, "HUMIDIFIER_01") == 0) { relay_pin = RELAY_HUMIDIFIER; }
-        else return;
-
-        if (strcmp(action, "TURN_ON") == 0 || strcmp(action, "OPEN") == 0) {
-            digitalWrite(relay_pin, RELAY_ON);
-            is_on = true;
+        // Check if payload contains source mode change (AUTO or MANUAL)
+        if (doc.containsKey("source")) {
+            const char* source_str = doc["source"];
+            if (source_str != nullptr) {
+                if (xSemaphoreTake(config_mutex, portMAX_DELAY)) {
+                    if (strcmp(source_str, "AUTO") == 0) {
+                        is_auto_mode = true;
+                        is_switching_mode = true;
+                        target_mode = "AUTO";
+                    } else if (strcmp(source_str, "MANUAL") == 0) {
+                        is_auto_mode = false;
+                        is_switching_mode = true;
+                        target_mode = "MANUAL";
+                    }
+                    xSemaphoreGive(config_mutex);
+                }
+            }
         }
-        else if (strcmp(action, "TURN_OFF") == 0 || strcmp(action, "CLOSE") == 0) {
-            digitalWrite(relay_pin, RELAY_OFF);
-            is_on = false;
+
+        // Send ACK for mode change (ALL or GATEWAY) for both AUTO and MANUAL
+        if (is_switching_mode && (strcmp(dev_id, "ALL") == 0 || strcmp(dev_id, "GATEWAY") == 0)) {
+            StaticJsonDocument<256> ack_mode;
+            ack_mode["event"]            = "COMMAND_ACK";
+            ack_mode["command_id"]       = cmd_id;
+            ack_mode["device_id"]        = dev_id;
+            ack_mode["room_id"]          = "P.101";
+            ack_mode["status"]           = "SUCCESS";
+            ack_mode["execution_time_ms"] = 10;
+            ack_mode["current_state"]    = strcmp(target_mode, "AUTO") == 0 ? "AUTO_MODE" : "MANUAL_MODE";
+            ack_mode["actual_state"]     = strcmp(target_mode, "AUTO") == 0 ? "AUTO_MODE" : "MANUAL_MODE";
+
+            if (doc.containsKey("timestamp")) {
+                ack_mode["timestamp"] = doc["timestamp"];
+            } else {
+                ack_mode["timestamp"] = millis();
+            }
+
+            char ack_payload[256];
+            serializeJson(ack_mode, ack_payload);
+
+            mqtt_client.publish("classroom/P.101/gateway/ack", ack_payload);
+            Serial.printf("[MQTT] Da chuyen sang che do %s va gui ACK thanh cong!\n", target_mode);
+            return;
         }
 
-        uint32_t end_time = micros();
-        float real_exec_time_ms = (end_time - start_time) / 1000.0;
-        const char* state_str = is_on ? "ON" : "OFF";
+        bool current_auto = true;
+        if (xSemaphoreTake(config_mutex, portMAX_DELAY)) {
+            current_auto = is_auto_mode;
+            xSemaphoreGive(config_mutex);
+        }
 
-        StaticJsonDocument<256> ack_manual;
-        ack_manual["event"] = "COMMAND_ACK";          
-        ack_manual["command_id"] = cmd_id;
-        ack_manual["device_id"] = dev_id;
-        ack_manual["room_id"] = "P.101";
-        ack_manual["status"] = "SUCCESS";
-        ack_manual["execution_time_ms"] = real_exec_time_ms;
-        ack_manual["current_state"] = state_str;
-        ack_manual["actual_state"]  = state_str;
-        
-        if (doc.containsKey("timestamp")) {
-            ack_manual["timestamp"] = doc["timestamp"]; 
+        // MANUAL mode
+        if (!current_auto) {
+            uint32_t start_time = micros();
+            int relay_pin = -1;
+            bool is_on = false;
+
+            if (strcmp(dev_id, "FAN_01") == 0)             { relay_pin = RELAY_FAN; }
+            else if (strcmp(dev_id, "LIGHT_01") == 0)      { relay_pin = RELAY_LIGHT; }
+            else if (strcmp(dev_id, "CURTAIN_01") == 0)    { relay_pin = RELAY_CURTAIN; }
+            else if (strcmp(dev_id, "HUMIDIFIER_01") == 0) { relay_pin = RELAY_HUMIDIFIER; }
+            else return;
+
+            if (strcmp(action, "TURN_ON") == 0 || strcmp(action, "OPEN") == 0) {
+                digitalWrite(relay_pin, RELAY_ON);
+                is_on = true;
+            } else if (strcmp(action, "TURN_OFF") == 0 || strcmp(action, "CLOSE") == 0) {
+                digitalWrite(relay_pin, RELAY_OFF);
+                is_on = false;
+            }
+
+            uint32_t end_time = micros();
+            float real_exec_time_ms = (end_time - start_time) / 1000.0;
+            const char* state_str = is_on ? "ON" : "OFF";
+
+            StaticJsonDocument<256> ack_manual;
+            ack_manual["event"]            = "COMMAND_ACK";
+            ack_manual["command_id"]       = cmd_id;
+            ack_manual["device_id"]        = dev_id;
+            ack_manual["room_id"]          = "P.101";
+            ack_manual["status"]           = "SUCCESS";
+            ack_manual["execution_time_ms"] = real_exec_time_ms;
+            ack_manual["current_state"]    = state_str;
+            ack_manual["actual_state"]     = state_str;
+
+            if (doc.containsKey("timestamp")) {
+                ack_manual["timestamp"] = doc["timestamp"];
+            } else {
+                ack_manual["timestamp"] = millis();
+            }
+
+            char ack_payload[256];
+            serializeJson(ack_manual, ack_payload);
+
+            char ack_topic[128];
+            snprintf(ack_topic, sizeof(ack_topic), "classroom/P.101/device/%s/ack", dev_id);
+            mqtt_client.publish(ack_topic, ack_payload);
+
+            Serial.printf("[MQTT] Da gui ACK MANUAL cho thiet bi: %s (%s)\n", dev_id, state_str);
         } else {
-            ack_manual["timestamp"] = millis();
+            Serial.println("[MQTT] He thong dang o che do AUTO, tu choi lenh MANUAL!");
         }
-        
-        char ack_payload[256];
-        serializeJson(ack_manual, ack_payload);
-        
-        char ack_topic[128];
-        snprintf(ack_topic, sizeof(ack_topic), "classroom/P.101/device/%s/ack", dev_id);
-        mqtt_client.publish(ack_topic, ack_payload); 
-        
-        Serial.printf("[MQTT] Da gui ACK cho thiet bi: %s (%s)\n", dev_id, state_str);
     }
 }
 
@@ -196,6 +254,25 @@ void task_mqtt_unified(void *pvParameters) {
                 mqtt_client.subscribe("classroom/P.101/config/thresholds");
 
                 Serial.println("[MQTT] Connected & Subscribed to command + config topics!");
+
+                auto publish_relay_state = [](const char* dev_id, int pin) {
+                    StaticJsonDocument<192> doc;
+                    doc["event"]        = "COMMAND_ACK";
+                    doc["device_id"]    = dev_id;
+                    doc["actual_state"] = (digitalRead(pin) == RELAY_ON) ? "ON" : "OFF";
+                    doc["status"]       = "SUCCESS";
+                    doc["source"]       = "BOOT_SYNC";
+                    char payload[192], topic[64];
+                    serializeJson(doc, payload);
+                    snprintf(topic, sizeof(topic), "classroom/P.101/device/%s/ack", dev_id);
+                    mqtt_client.publish(topic, payload);
+                };
+
+                publish_relay_state("FAN_01",        RELAY_FAN);
+                publish_relay_state("LIGHT_01",      RELAY_LIGHT);
+                publish_relay_state("CURTAIN_01",    RELAY_CURTAIN);
+                publish_relay_state("HUMIDIFIER_01", RELAY_HUMIDIFIER);
+                Serial.println("[MQTT] Da dong bo trang thai relay len backend!");
             } else {
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
                 continue;
