@@ -50,8 +50,8 @@ class DeviceCommandService {
     if (!MANUAL_ACTIONS.has(action)) {
       throw new DeviceCommandError('Unsupported device action');
     }
-    if (!['MANUAL', 'AUTO'].includes(source)) {
-      throw new DeviceCommandError('source must be MANUAL or AUTO');
+    if (!['MANUAL', 'AUTO', 'SAFE_MODE'].includes(source)) {
+      throw new DeviceCommandError('source must be MANUAL, AUTO or SAFE_MODE');
     }
 
     const device = await this.devices.getDeviceById(deviceId);
@@ -61,7 +61,7 @@ class DeviceCommandService {
     }
 
     const commandId = `CMD-${randomUUID()}`;
-    const actor = requestedBy || (source === 'AUTO' ? 'automation-engine' : 'unknown-user');
+    const actor = requestedBy || (source === 'SAFE_MODE' ? 'safe-mode-engine' : source === 'AUTO' ? 'automation-engine' : 'unknown-user');
     await this.devices.createCommand({ commandId, deviceId, action, requestedBy: actor, source });
 
     const published = this.publishCommand(deviceId, {
@@ -74,7 +74,7 @@ class DeviceCommandService {
       timestamp: Math.floor(this.now().getTime() / 1000),
     });
 
-    if (!published) {
+    if (!published && source === 'MANUAL') {
       await this.#finish(commandId, {
         roomId,
         deviceId,
@@ -86,11 +86,8 @@ class DeviceCommandService {
       throw new DeviceCommandError('MQTT gateway is unavailable', 503);
     }
 
-    // In AUTO mode the ESP32 firmware rule engine controls relays directly and
-    // rejects all incoming MQTT commands. No ACK will ever arrive, so we
-    // immediately perform an optimistic state update instead of waiting for a
-    // timeout that would leave the web UI stale.
-    if (source === 'AUTO') {
+    // In AUTO and SAFE_MODE, update actual states optimistically in database & UI
+    if (source === 'AUTO' || source === 'SAFE_MODE') {
       const actionStateMap = { TURN_ON: 'ON', TURN_OFF: 'OFF', OPEN: 'OPENING', CLOSE: 'CLOSING', STOP: 'STOPPED' };
       const optimisticState = actionStateMap[action] ?? 'ON';
       await this.devices.updateCommandResult(commandId, { status: 'SUCCESS', executionTimeMs: 0 });
@@ -115,6 +112,7 @@ class DeviceCommandService {
         deviceName: device.name ?? null,
       };
     }
+
 
     this.pendingTimers.set(commandId, this.setTimer(() => {
       void this.#handleTimeout({ commandId, roomId, deviceId, action, source });

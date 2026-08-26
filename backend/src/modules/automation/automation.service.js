@@ -48,8 +48,13 @@ class AutomationService {
     return result.currentState;
   }
 
-  async handleGatewayStatus(roomId, gatewayStatus) {
-    const isOffline = ['OFFLINE', 'DEGRADED'].includes(gatewayStatus);
+  async handleGatewayStatus(inputRoomId, inputGatewayStatus) {
+    const roomId = (typeof inputRoomId === 'object' && inputRoomId !== null) ? inputRoomId.roomId : inputRoomId;
+    const gatewayStatus = (typeof inputRoomId === 'object' && inputRoomId !== null)
+      ? (inputRoomId.gatewayStatus || inputRoomId.gateway?.status || 'OFFLINE')
+      : (inputGatewayStatus?.status || inputGatewayStatus || 'OFFLINE');
+
+    const isOffline = ['OFFLINE', 'DEGRADED'].includes(String(gatewayStatus).toUpperCase());
     if (isOffline) {
       const previousState = this.getSafeMode(roomId);
       if (previousState !== SAFE_MODE_STATE.SAFE_MODE) {
@@ -58,7 +63,7 @@ class AutomationService {
           roomId,
           severity: ALERT_SEVERITY.CRITICAL,
           source: 'SAFE_MODE',
-          message: `Safe Mode activated: ESP32 Gateway is ${gatewayStatus.toLowerCase()}`,
+          message: `Safe Mode activated: ESP32 Gateway is ${String(gatewayStatus).toLowerCase()}`,
         });
         this.realtime.publishToRoom(roomId, { event: REALTIME_EVENT.ALERT_NEW, data: alert });
         await this.enforceSafeModeDevices(roomId);
@@ -69,6 +74,7 @@ class AutomationService {
       }
     }
   }
+
 
   async enforceSafeModeDevices(roomId) {
     if (!this.deviceCommands) return;
