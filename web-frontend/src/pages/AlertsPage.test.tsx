@@ -33,7 +33,10 @@ vi.mock('../services/alertApi', () => ({
 }))
 
 beforeEach(() => {
-  localStorage.clear()
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.clear()
+    window.localStorage.setItem('role', 'admin')
+  }
   vi.clearAllMocks()
 })
 

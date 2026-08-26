@@ -13,6 +13,7 @@ import {
   Wind,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { getUserRole } from '../lib/api'
 import { subscribeToRealtime } from '../services/socket'
 import {
   controlDevice,
@@ -35,6 +36,9 @@ const deviceIcons: Record<string, typeof LampDesk> = {
 }
 
 export function DeviceControlPage() {
+  const userRole = getUserRole()
+  const canChangeMode = userRole === 'admin' || userRole === 'technician'
+
   const [mode, setMode] = useState<'MANUAL' | 'AUTO'>('MANUAL')
   const [devices, setDevices] = useState<DeviceDto[]>([])
   const [commands, setCommands] = useState<DeviceCommandLogDto[]>([])
@@ -44,6 +48,7 @@ export function DeviceControlPage() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
   const isLocked = mode === 'AUTO'
+
 
   const loadData = async (isInitial = false) => {
     if (isInitial) setLoading(true)
@@ -120,6 +125,13 @@ export function DeviceControlPage() {
   }, [])
 
   const handleModeChange = async (targetMode: 'MANUAL' | 'AUTO') => {
+    if (!canChangeMode) {
+      setNotification({
+        type: 'error',
+        message: 'Chỉ Kỹ thuật viên hoặc Quản trị viên mới có quyền chuyển đổi chế độ phòng.',
+      })
+      return
+    }
     if (mode === targetMode || isChangingMode) return
     setIsChangingMode(true)
     try {
@@ -223,11 +235,12 @@ export function DeviceControlPage() {
         <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/40 p-1.5 shadow-inner">
           <button
             aria-pressed={mode === 'MANUAL'}
-            disabled={isChangingMode}
+            disabled={isChangingMode || !canChangeMode}
+            title={!canChangeMode ? 'Chỉ Kỹ thuật viên hoặc Quản trị viên mới có quyền đổi chế độ' : undefined}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition ${
               mode === 'MANUAL'
                 ? 'bg-cyan-400 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-slate-100 disabled:opacity-50'
+                : 'text-slate-400 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40'
             }`}
             onClick={() => handleModeChange('MANUAL')}
             type="button"
@@ -236,11 +249,12 @@ export function DeviceControlPage() {
           </button>
           <button
             aria-pressed={mode === 'AUTO'}
-            disabled={isChangingMode}
+            disabled={isChangingMode || !canChangeMode}
+            title={!canChangeMode ? 'Chỉ Kỹ thuật viên hoặc Quản trị viên mới có quyền đổi chế độ' : undefined}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition ${
               mode === 'AUTO'
                 ? 'bg-cyan-400 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-slate-100 disabled:opacity-50'
+                : 'text-slate-400 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40'
             }`}
             onClick={() => handleModeChange('AUTO')}
             type="button"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { clearSession, hasValidSession } from './lib/api'
+import { clearSession, getUserRole, hasValidSession } from './lib/api'
 import { heartbeatApi, logoutApi } from './services/adminApi'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { AdminPage } from './pages/AdminPage'
@@ -13,6 +13,14 @@ import { RegistrationPage } from './pages/RegistrationPage'
 import { SystemStatusPage } from './pages/SystemStatusPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+
+function ProtectedRoute({ allowedRoles, children }: { allowedRoles: ('admin' | 'technician' | 'user')[]; children: React.ReactElement }) {
+  const role = getUserRole()
+  if (!allowedRoles.includes(role)) {
+    return <Navigate replace to="/dashboard" />
+  }
+  return children
+}
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(hasValidSession)
@@ -66,8 +74,8 @@ function App() {
           <Route element={<MonitoringPage />} path="/monitoring" />
           <Route element={<DeviceControlPage />} path="/devices" />
           <Route element={<AlertsPage />} path="/alerts" />
-          <Route element={<SystemStatusPage />} path="/system-status" />
-          <Route element={<AdminPage />} path="/admin" />
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'technician']}><SystemStatusPage /></ProtectedRoute>} path="/system-status" />
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'technician']}><AdminPage /></ProtectedRoute>} path="/admin" />
         </Route>
         <Route element={<Navigate replace to={isAuthenticated ? '/dashboard' : '/login'} />} path="*" />
       </Routes>

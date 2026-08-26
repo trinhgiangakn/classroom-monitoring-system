@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { getUserRole } from '../../lib/api'
 import { getAlertSummary } from '../../services/alertApi'
 import { getGatewayStatus, getSystemHealth } from '../../services/dev2Api'
 import {
@@ -22,11 +23,16 @@ const navigationItems = [
   { label: 'Giám sát dữ liệu', icon: ChartNoAxesCombined, to: '/monitoring' },
   { label: 'Điều khiển thiết bị', icon: SlidersHorizontal, to: '/devices' },
   { label: 'Cảnh báo', icon: Bell, to: '/alerts' },
-  { label: 'Trạng thái hệ thống', icon: MonitorCog, to: '/system-status' },
-  { label: 'Quản trị', icon: Settings, to: '/admin' },
+  { label: 'Trạng thái hệ thống', icon: MonitorCog, to: '/system-status', roles: ['admin', 'technician'] },
+  { label: 'Quản trị', icon: Settings, to: '/admin', roles: ['admin', 'technician'] },
 ]
 
 export function Sidebar() {
+  const userRole = getUserRole()
+  const visibleNavItems = navigationItems.filter(
+    item => !item.roles || item.roles.includes(userRole)
+  )
+
   const [unresolvedAlerts, setUnresolvedAlerts] = useState<number | null>(null)
   const [connection, setConnection] = useState<RealtimeConnectionState>('disconnected')
   const [mqttOnline, setMqttOnline] = useState<boolean | null>(null)
@@ -91,7 +97,7 @@ export function Sidebar() {
       </div>
 
       <nav aria-label="Điều hướng dashboard" className="flex gap-2 overflow-x-auto px-3 pb-4 lg:flex-col lg:overflow-visible">
-        {navigationItems.map(({ label, icon: Icon, to }) => (
+        {visibleNavItems.map(({ label, icon: Icon, to }) => (
           <NavLink
             className={({ isActive }) => `flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
               isActive

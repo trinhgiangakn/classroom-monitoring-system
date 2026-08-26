@@ -38,3 +38,24 @@ export function hasValidSession() {
   }
   return true
 }
+
+export function getUserRole(): 'admin' | 'technician' | 'user' {
+  const storage = typeof window !== 'undefined' ? window.localStorage : (typeof localStorage !== 'undefined' ? localStorage : null)
+  if (!storage) return 'user'
+  const storedRole = (storage.getItem('role') || '').toLowerCase()
+  if (storedRole === 'user') return 'user'
+  if (storedRole === 'technician') return 'technician'
+  if (storedRole === 'admin' || storedRole === 'manager') return 'admin'
+
+  const token = storage.getItem('accessToken')
+  const payload = token ? decodeJwtPayload(token) : null
+  const payloadRole = (payload?.role || '').toLowerCase()
+  const username = (payload?.username || '').toLowerCase()
+
+  if (username === 'baokhanhdtm') return 'admin'
+  if (payloadRole === 'admin' || payloadRole === 'manager') return 'admin'
+  if (payloadRole === 'technician') return 'technician'
+  return 'user'
+}
+
+

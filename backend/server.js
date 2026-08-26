@@ -157,6 +157,7 @@ async function createApp({
         service: alertService,
         authenticate: verifyToken,
         requireAdmin: requireRole('admin'),
+        requireTechOrAdmin: requireRole('admin', 'technician'),
     }));
 
     // Register Dev 3 device control API routes

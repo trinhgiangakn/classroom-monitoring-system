@@ -1,13 +1,17 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DeviceControlPage } from './DeviceControlPage'
 import * as deviceApi from '../services/deviceApi'
 
 describe('DeviceControlPage', () => {
   beforeEach(() => {
+    localStorage.clear()
+    localStorage.setItem('role', 'admin')
     vi.restoreAllMocks()
   })
+
+  afterEach(cleanup)
 
   it('renders device control page and handles mode switching', async () => {
     let currentMode: 'AUTO' | 'MANUAL' = 'MANUAL'
@@ -48,6 +52,27 @@ describe('DeviceControlPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/AUTO đang kích hoạt/i)).toBeInTheDocument()
+    })
+  })
+
+  it('disables mode switching for user role', async () => {
+    localStorage.clear()
+    localStorage.setItem('role', 'user')
+
+    vi.spyOn(deviceApi, 'getDevices').mockImplementation(async () => ({
+      success: true,
+      room_id: 'P.101',
+      operation_mode: 'MANUAL',
+      manual_control_locked: false,
+      devices: [],
+    }))
+    vi.spyOn(deviceApi, 'getDeviceCommands').mockResolvedValue([])
+
+    render(<DeviceControlPage />)
+
+    await waitFor(() => {
+      const autoBtn = screen.getByRole('button', { name: /AUTO/i })
+      expect(autoBtn).toBeDisabled()
     })
   })
 })

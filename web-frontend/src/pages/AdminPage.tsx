@@ -45,22 +45,27 @@ import {
   type UserItem,
 } from '../services/adminApi'
 
-import { decodeJwtPayload } from '../lib/api'
+import { decodeJwtPayload, getUserRole } from '../lib/api'
 
-const tabs = ['Người dùng', 'Ngưỡng cảnh báo', 'Luật tự động', 'Nhật ký thao tác'] as const
-type Tab = typeof tabs[number]
+const allTabs = ['Người dùng', 'Ngưỡng cảnh báo', 'Luật tự động', 'Nhật ký thao tác'] as const
+type Tab = typeof allTabs[number]
 
 export function AdminPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('Người dùng')
-  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-
+  const userRole = getUserRole()
   const token = localStorage.getItem('accessToken')
   const payload = token ? decodeJwtPayload(token) : null
   const currentUsername = (payload?.username || '').toLowerCase()
-  const currentUserRole = (localStorage.getItem('role') || payload?.role || 'user').toLowerCase()
-  const isManager = currentUserRole === 'manager' || currentUserRole === 'admin' || currentUsername === 'baokhanhdtm'
+  const isManager = userRole === 'admin' || currentUsername === 'baokhanhdtm'
+  const isTechnician = userRole === 'technician'
 
-  if (currentUsername === 'baokhanhdtm' && currentUserRole !== 'admin') {
+  const availableTabs: Tab[] = isManager
+    ? ['Người dùng', 'Ngưỡng cảnh báo', 'Luật tự động', 'Nhật ký thao tác']
+    : ['Ngưỡng cảnh báo', 'Luật tự động']
+
+  const [activeTab, setActiveTab] = useState<Tab>(isManager ? 'Người dùng' : 'Ngưỡng cảnh báo')
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  if (currentUsername === 'baokhanhdtm' && userRole !== 'admin') {
     localStorage.setItem('role', 'admin')
   }
 
@@ -79,11 +84,13 @@ export function AdminPage() {
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
-              {isManager ? 'Manager RBAC · Toàn quyền quản trị' : 'Read only · Chế độ xem'}
+              {isManager ? 'Manager RBAC · Toàn quyền quản trị' : isTechnician ? 'Technician RBAC · Cấu hình Hạ tầng & Luật AUTO' : 'Read only · Chế độ xem'}
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">Quản trị hệ thống</h1>
             <p className="mt-1 text-sm text-slate-400">
-              Quản lý phân quyền người dùng, cấu hình ngưỡng cảm biến, động cơ luật AUTO và nhật ký bảo mật.
+              {isManager
+                ? 'Quản lý phân quyền người dùng, cấu hình ngưỡng cảm biến, động cơ luật AUTO và nhật ký bảo mật.'
+                : 'Cấu hình ngưỡng kích hoạt cảm biến và kiểm soát quy tắc tự động hóa phòng học P.101.'}
             </p>
           </div>
         </div>
@@ -91,7 +98,7 @@ export function AdminPage() {
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
-        {tabs.map((tab) => (
+        {availableTabs.map((tab) => (
           <button
             aria-pressed={activeTab === tab}
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${

@@ -68,9 +68,9 @@ router.get('/rules', verifyToken, async (req, res) => {
 
 /**
  * PUT /api/automation/rules/:id/toggle
- * Toggle enabled state of an automation rule (Admin / Manager only).
+ * Toggle enabled state of an automation rule (Admin / Manager / Technician).
  */
-router.put('/rules/:id/toggle', verifyToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/rules/:id/toggle', verifyToken, requireRole('admin', 'manager', 'technician'), async (req, res) => {
     try {
         const ruleId = req.params.id;
         const { enabled } = req.body;
@@ -165,9 +165,9 @@ router.get('/thresholds', verifyToken, async (req, res) => {
 
 /**
  * PUT /api/automation/thresholds
- * Save trigger thresholds for Room P.101 (Admin / Manager only).
+ * Save trigger thresholds for Room P.101 (Admin / Manager / Technician).
  */
-router.put('/thresholds', verifyToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/thresholds', verifyToken, requireRole('admin', 'manager', 'technician'), async (req, res) => {
     try {
         const {
             tempOn,
