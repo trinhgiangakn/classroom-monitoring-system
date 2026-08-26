@@ -83,3 +83,36 @@ test('dispatches an AUTO command through the DEV 3 port after a rule delay', asy
   assert.equal(result.commandId, 'CMD-001');
   assert.equal(published[0].event, 'automation:action');
 });
+
+test('enforces safe device states (Fan ON, Humidifier/Light OFF, Curtain STOP) when Safe Mode activates', async () => {
+  const { service, commands } = createService();
+  await service.handleNodeStatuses('P.101', [
+    { roomId: 'P.101', nodeId: 'NODE-NW', status: 'OFFLINE' },
+    { roomId: 'P.101', nodeId: 'NODE-NE', status: 'OFFLINE' },
+  ]);
+
+  assert.equal(service.getSafeMode('P.101'), SAFE_MODE_STATE.SAFE_MODE);
+  assert.equal(commands.length, 4);
+  assert.deepEqual(
+    commands.map(c => ({ deviceId: c.deviceId, action: c.action, source: c.source })),
+    [
+      { deviceId: 'FAN_01', action: 'TURN_ON', source: 'SAFE_MODE' },
+      { deviceId: 'HUMIDIFIER_01', action: 'TURN_OFF', source: 'SAFE_MODE' },
+      { deviceId: 'LIGHT_01', action: 'TURN_OFF', source: 'SAFE_MODE' },
+      { deviceId: 'CURTAIN_01', action: 'STOP', source: 'SAFE_MODE' },
+    ]
+  );
+});
+
+test('activates Safe Mode and enforces safety commands when ESP32 Gateway becomes OFFLINE', async () => {
+  const { service, commands } = createService();
+  await service.handleGatewayStatus('P.101', 'OFFLINE');
+
+  assert.equal(service.getSafeMode('P.101'), SAFE_MODE_STATE.SAFE_MODE);
+  assert.equal(commands.length, 4);
+  assert.equal(commands[0].deviceId, 'FAN_01');
+  assert.equal(commands[0].action, 'TURN_ON');
+  assert.equal(commands[1].deviceId, 'HUMIDIFIER_01');
+  assert.equal(commands[1].action, 'TURN_OFF');
+});
+

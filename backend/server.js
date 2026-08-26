@@ -251,7 +251,10 @@ async function startServer(options = {}) {
             await monitoringAlerts?.handleNodeStatuses(input);
             await automationRuntime?.handleNodeStatuses(input);
         },
-        onGatewayStatusChanged: async (input) => monitoringAlerts?.handleGatewayStatus(input),
+        onGatewayStatusChanged: async (input) => {
+            await monitoringAlerts?.handleGatewayStatus(input);
+            await automationRuntime?.handleGatewayStatus(input);
+        },
     });
 
     // Wrap Express application with HTTP server to attach Socket.io (Dev 3)

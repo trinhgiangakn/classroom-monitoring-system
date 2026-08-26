@@ -42,6 +42,11 @@ class AutomationRuntime {
   handleNodeStatuses({ roomId, statuses }) {
     return this.automationService.handleNodeStatuses(roomId, statuses);
   }
+
+  handleGatewayStatus({ roomId, gatewayStatus }) {
+    return this.automationService.handleGatewayStatus(roomId, gatewayStatus);
+  }
 }
+
 
 module.exports = { AutomationRuntime };

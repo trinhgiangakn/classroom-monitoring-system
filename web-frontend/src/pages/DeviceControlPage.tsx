@@ -88,30 +88,37 @@ export function DeviceControlPage() {
     }, 5000)
 
     // ── Realtime WebSocket subscriptions ──────────────────────────────────
-    // Backend broadcasts 'device:status' when AUTO mode automation changes a relay.
+    // Backend broadcasts 'device:status' or 'automation:action' when AUTO/Safe Mode changes a relay.
     // Backend broadcasts 'device:command-update' when a command result arrives.
-    const unsubStatus = subscribeToRealtime(['device:status'], (payload) => {
-      const data = (payload as any)?.data ?? payload
-      const deviceId: string | undefined = data?.device_id
-      const actualState: string | undefined = data?.actual_state
-      if (!deviceId || !actualState) return
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.device_id === deviceId ? { ...d, actual_state: actualState } : d
-        )
-      )
-    })
+    const unsubStatus = subscribeToRealtime(
+      ['device:status', 'automation:action', 'mode:update'],
+      (payload) => {
+        const data = (payload as any)?.data ?? payload
+        const deviceId: string | undefined = data?.device_id ?? data?.deviceId
+        const actualState: string | undefined = data?.actual_state ?? (data?.action === 'TURN_ON' ? 'ON' : data?.action === 'TURN_OFF' ? 'OFF' : data?.action === 'STOP' ? 'STOPPED' : undefined)
+        if (deviceId && actualState) {
+          setDevices((prev) =>
+            prev.map((d) =>
+              d.device_id === deviceId ? { ...d, actual_state: actualState } : d
+            )
+          )
+        }
+        // Always refresh full devices state for room mode or safe mode updates
+        loadData(false)
+      }
+    )
 
     const unsubCmd = subscribeToRealtime(['device:command-update'], (payload) => {
       const data = (payload as any)?.data ?? payload
       const deviceId: string | undefined = data?.device_id
       const actualState: string | undefined = data?.actual_state
-      if (!deviceId || !actualState) return
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.device_id === deviceId ? { ...d, actual_state: actualState } : d
+      if (deviceId && actualState) {
+        setDevices((prev) =>
+          prev.map((d) =>
+            d.device_id === deviceId ? { ...d, actual_state: actualState } : d
+          )
         )
-      )
+      }
       // Refresh command history list when a new command result arrives
       getDeviceCommands(10).then((cmds) => setCommands(cmds)).catch(() => {})
     })
@@ -123,6 +130,7 @@ export function DeviceControlPage() {
       unsubCmd()
     }
   }, [])
+
 
   const handleModeChange = async (targetMode: 'MANUAL' | 'AUTO') => {
     if (!canChangeMode) {
