@@ -10,12 +10,12 @@ void setUp(void) {
 void tearDown(void) {}
 
 void test_feature_timeout(void) {
-    update_node_data(1, 26.0, 55.0, 400.0, 45.0, 1010.0);
+    update_node_data(1, 26.0f, 55.0f, 400.0f, 45.0f, 1010.0f);
     
     node_cache[1].last_update = millis() - (NODE_TIMEOUT_MS + 1000); 
     
     bool is_timeout = ((millis() - node_cache[1].last_update) > NODE_TIMEOUT_MS);
-    TEST_ASSERT_TRUE_MESSAGE(is_timeout, "Lỗi: Không phát hiện được Node bị timeout!");
+    TEST_ASSERT_TRUE_MESSAGE(is_timeout, "Loi: Khong phat hien duoc Node bi timeout!");
 }
 
 void setup() {

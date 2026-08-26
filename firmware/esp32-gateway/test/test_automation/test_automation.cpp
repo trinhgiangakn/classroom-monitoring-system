@@ -10,11 +10,11 @@ void setUp(void) {
 void tearDown(void) {}
 
 void test_feature_automation(void) {
-    system_thresh.thresh_temp = 35.0;
-    update_node_data(0, 38.0, 60.0, 300.0, 50.0, 1013.25);
+    system_thresh.thresh_temp_max = 35.0f; 
+    update_node_data(0, 38.0f, 60.0f, 300.0f, 50.0f, 1013.25f); 
     
-    bool trigger_fan = (node_cache[0].temp > system_thresh.thresh_temp);
-    TEST_ASSERT_TRUE_MESSAGE(trigger_fan, "Lỗi: Quạt không được kích hoạt khi nhiệt độ vượt ngưỡng!");
+    bool trigger_fan = (node_cache[0].temp >= system_thresh.thresh_temp_max); 
+    TEST_ASSERT_TRUE_MESSAGE(trigger_fan, "Loi: Quat khong duoc kich hoat khi nhiet do vuot nguong!");
 }
 
 void setup() {

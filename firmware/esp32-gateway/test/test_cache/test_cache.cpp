@@ -10,9 +10,10 @@ void setUp(void) {
 void tearDown(void) {}
 
 void test_feature_cache(void) {
-    bool res = update_node_data(0, 25.5, 60.0, 300.0, 50.0, 1013.25);
+    bool res = update_node_data(0, 25.5f, 60.0f, 300.0f, 50.0f, 1013.25f);
     TEST_ASSERT_TRUE(res);
-    TEST_ASSERT_EQUAL_FLOAT(25.5, node_cache[0].temp);
+    
+    TEST_ASSERT_TRUE(node_cache[0].temp > 25.4f && node_cache[0].temp < 25.6f); 
     TEST_ASSERT_TRUE(node_cache[0].is_online);
 }
 

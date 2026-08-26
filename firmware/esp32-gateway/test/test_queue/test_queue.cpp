@@ -24,9 +24,9 @@ void test_feature_queue(void) {
         mqtt_msg_t dummy;
         xQueueReceive(mqtt_queue, &dummy, 0); 
         BaseType_t res = xQueueSend(mqtt_queue, &msg, 0);
-        TEST_ASSERT_EQUAL_MESSAGE(pdPASS, res, "Lỗi: Không thể ghi đè vào Ring Buffer!");
+        TEST_ASSERT_EQUAL_MESSAGE((int)pdPASS, (int)res, "Loi: Khong the ghi de vao Ring Buffer!");
     } else {
-        TEST_FAIL_MESSAGE("Lỗi: Hàng đợi chưa thực sự đầy (cấu hình sai kích thước)!");
+        TEST_FAIL_MESSAGE("Loi: Hang doi chua thuc su day (cau hinh sai kich thuoc)!");
     }
 }
 

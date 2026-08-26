@@ -1,8 +1,8 @@
 #pragma once
 
 // WiFi configuration
-#define WIFI_SSID_DEFAULT "Minhu T1"
-#define WIFI_PASS_DEFAULT "Phudien68@"
+#define WIFI_SSID_DEFAULT ":)=)"
+#define WIFI_PASS_DEFAULT "tumotdentam"
 
 // MQTT configuration
 #define MQTT_SERVER_DEFAULT "630e48d228ed449080ea87a71f32be48.s1.eu.hivemq.cloud"

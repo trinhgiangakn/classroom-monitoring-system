@@ -22,7 +22,6 @@ extern Preferences nvs;
 
 // Global variables for system configuration and state.
 extern threshold_config_t system_thresh;
-extern bool is_auto_mode;
 extern SemaphoreHandle_t config_mutex;
 
 // Global variable to track MQTT connection status.
