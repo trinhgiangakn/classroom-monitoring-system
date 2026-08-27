@@ -38,7 +38,9 @@ class AutomationService {
         message: `Safe Mode activated: ${result.offlineNodeIds.length} sensor nodes are offline`,
       });
       this.realtime.publishToRoom(roomId, { event: REALTIME_EVENT.ALERT_NEW, data: alert });
-      await this.enforceSafeModeDevices(roomId);
+      // TODO (future): await this.enforceSafeModeDevices(roomId);
+      // Disabled: causes race condition with ESP32 AUTO mode relay logic.
+      // Requires firmware-level SAFE_MODE source support before re-enabling.
     }
 
     this.realtime.publishToRoom(roomId, {
@@ -66,7 +68,9 @@ class AutomationService {
           message: `Safe Mode activated: ESP32 Gateway is ${String(gatewayStatus).toLowerCase()}`,
         });
         this.realtime.publishToRoom(roomId, { event: REALTIME_EVENT.ALERT_NEW, data: alert });
-        await this.enforceSafeModeDevices(roomId);
+        // TODO (future): await this.enforceSafeModeDevices(roomId);
+        // Disabled: causes race condition with ESP32 AUTO mode relay logic.
+        // Requires firmware-level SAFE_MODE source support before re-enabling.
         this.realtime.publishToRoom(roomId, {
           event: REALTIME_EVENT.MODE_UPDATE,
           data: { safeMode: SAFE_MODE_STATE.SAFE_MODE, gatewayOffline: true },
