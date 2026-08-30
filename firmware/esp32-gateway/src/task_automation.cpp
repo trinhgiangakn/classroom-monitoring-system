@@ -41,6 +41,9 @@ void task_automation(void *pvParameters) {
 
         if (current_auto || !is_connected) {
             if (xSemaphoreTake(cache_mutex, portMAX_DELAY)) {
+                float sum_temp = 0.0f, sum_humid = 0.0f, sum_light = 0.0f;
+                int online_count = 0;
+
                 for (int i = 0; i < 4; i++) {
                     if (!node_cache[i].is_online) continue;
 
@@ -49,13 +52,24 @@ void task_automation(void *pvParameters) {
                         continue;
                     }
 
+                    sum_temp  += node_cache[i].temp;
+                    sum_humid += node_cache[i].humid;
+                    sum_light += node_cache[i].light;
+                    online_count++;
+                }
+
+                if (online_count > 0) {
+                    float avg_temp  = sum_temp / online_count;
+                    float avg_humid = sum_humid / online_count;
+                    float avg_light = sum_light / online_count;
+
                     // TEMPERATURE LOGIC (Fan) - Hysteresis
-                    if (node_cache[i].temp >= local_thresh.thresh_temp_max) {
+                    if (avg_temp >= local_thresh.thresh_temp_max) {
                         if (digitalRead(RELAY_FAN) != RELAY_ON) {
                             digitalWrite(RELAY_FAN, RELAY_ON);
                             publish_auto_state("FAN_01", "ON");
                         }
-                    } else if (node_cache[i].temp <= local_thresh.thresh_temp_min) {
+                    } else if (avg_temp <= local_thresh.thresh_temp_min) {
                         if (digitalRead(RELAY_FAN) != RELAY_OFF) {
                             digitalWrite(RELAY_FAN, RELAY_OFF);
                             publish_auto_state("FAN_01", "OFF");
@@ -63,7 +77,7 @@ void task_automation(void *pvParameters) {
                     }
 
                     // LIGHT LOGIC (Lamp & Curtain) - Hysteresis
-                    if (node_cache[i].light <= local_thresh.thresh_light_low) {
+                    if (avg_light <= local_thresh.thresh_light_low) {
                         if (digitalRead(RELAY_LIGHT) != RELAY_ON) {
                             digitalWrite(RELAY_LIGHT, RELAY_ON);
                             publish_auto_state("LIGHT_01", "ON");
@@ -72,7 +86,7 @@ void task_automation(void *pvParameters) {
                             digitalWrite(RELAY_CURTAIN, RELAY_OFF);
                             publish_auto_state("CURTAIN_01", "OFF");
                         }
-                    } else if (node_cache[i].light >= local_thresh.thresh_light_high) {
+                    } else if (avg_light >= local_thresh.thresh_light_high) {
                         if (digitalRead(RELAY_CURTAIN) != RELAY_ON) {
                             digitalWrite(RELAY_CURTAIN, RELAY_ON);
                             publish_auto_state("CURTAIN_01", "ON");
@@ -84,12 +98,12 @@ void task_automation(void *pvParameters) {
                     }
 
                     // HUMIDITY LOGIC (Humidifier) - Hysteresis
-                    if (node_cache[i].humid >= local_thresh.thresh_humid_max) {
+                    if (avg_humid >= local_thresh.thresh_humid_max) {
                         if (digitalRead(RELAY_HUMIDIFIER) != RELAY_OFF) {
                             digitalWrite(RELAY_HUMIDIFIER, RELAY_OFF);
                             publish_auto_state("HUMIDIFIER_01", "OFF");
                         }
-                    } else if (node_cache[i].humid <= local_thresh.thresh_humid_min) {
+                    } else if (avg_humid <= local_thresh.thresh_humid_min) {
                         if (digitalRead(RELAY_HUMIDIFIER) != RELAY_ON) {
                             digitalWrite(RELAY_HUMIDIFIER, RELAY_ON);
                             publish_auto_state("HUMIDIFIER_01", "ON");
